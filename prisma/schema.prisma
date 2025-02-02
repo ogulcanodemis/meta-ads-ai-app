@@ -1,0 +1,173 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String         @id @default(cuid())
+  email             String         @unique
+  name              String?
+  password          String
+  company           String?
+  role              String         @default("user")
+  image             String?
+  position          String?        // Job position/title
+  bio               String?        // User biography
+  expertise         String[]       // Areas of expertise
+  socialLinks       Json?          // Social media links
+  phoneNumber       String?
+  address           String?
+  timezone          String?        @default("UTC")
+  lastLoginAt       DateTime?
+  isEmailVerified   Boolean        @default(false)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  settings          UserSettings?
+  campaigns         Campaign[]
+  notifications     Notification[]
+  reports           Report[]       // Reports created by user
+  activities        Activity[]     // User activities
+  metaAccounts      MetaAccount[]  // Connected Meta Business accounts
+}
+
+model UserSettings {
+  id                 String   @id @default(cuid())
+  userId            String   @unique
+  theme             String   @default("system")
+  language          String   @default("en")
+  timezone          String   @default("UTC")
+  emailNotifications Boolean  @default(true)
+  pushNotifications  Boolean  @default(true)
+  marketingEmails    Boolean  @default(false)
+  apiKey            String?
+  webhookUrl        String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Campaign {
+  id          String   @id @default(cuid())
+  userId      String
+  campaignId  String
+  name        String
+  status      String
+  objective   String?
+  spendCap    Float?
+  dailyBudget Float?
+  startTime   DateTime?
+  endTime     DateTime?
+  lastUpdated DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adSets      AdSet[]
+  analytics   Analytics[]
+  reports     Report[]
+  activities  Activity[]
+  metaAccount MetaAccount @relation(fields: [metaAccountId], references: [id])
+  metaAccountId String
+
+  @@unique([userId, campaignId])
+  @@index([userId])
+}
+
+model AdSet {
+  id                String    @id @default(cuid())
+  name              String
+  campaignId        String
+  campaign          Campaign  @relation(fields: [campaignId], references: [id])
+  status            String
+  budget            Float?
+  bidStrategy       String?
+  targeting         Json?
+  metrics           Json?
+  startDate         DateTime
+  endDate           DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model Analytics {
+  id                String    @id @default(cuid())
+  campaignId        String
+  campaign          Campaign  @relation(fields: [campaignId], references: [id])
+  data              Json      // Raw analytics data
+  metrics           Json      // Processed metrics
+  insights          Json?     // AI-generated insights
+  recommendations   Json?     // AI-generated recommendations
+  date              DateTime
+  createdAt         DateTime  @default(now())
+}
+
+model Report {
+  id                String    @id @default(cuid())
+  name              String
+  type              String    // performance, insights, custom
+  content           Json
+  format            String    @default("pdf") // pdf, csv, xlsx
+  schedule          Json?     // Report scheduling settings
+  lastGenerated     DateTime?
+  campaignId        String
+  campaign          Campaign  @relation(fields: [campaignId], references: [id])
+  userId            String
+  user              User      @relation(fields: [userId], references: [id])
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model Notification {
+  id                String    @id @default(cuid())
+  title             String
+  message           String
+  type              String    // info, success, warning, error
+  category          String    // campaign, report, system, etc.
+  read              Boolean   @default(false)
+  actionUrl         String?   // URL to redirect when clicked
+  userId            String
+  user              User      @relation(fields: [userId], references: [id])
+  createdAt         DateTime  @default(now())
+  expiresAt         DateTime?
+}
+
+model Activity {
+  id                String    @id @default(cuid())
+  type              String    // login, campaign_update, report_generation, etc.
+  description       String
+  metadata          Json?     // Additional activity data
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaignId        String?
+  campaign          Campaign?   @relation(fields: [campaignId], references: [id])
+  createdAt         DateTime  @default(now())
+}
+
+model MetaAccount {
+  id                String     @id @default(cuid())
+  name              String?
+  accountId         String     // Meta Business Account ID
+  accessToken       String
+  status            String     @default("active")
+  permissions       String[]   // Granted permissions
+  userId            String
+  user              User       @relation(fields: [userId], references: [id])
+  campaigns         Campaign[]
+  lastSyncedAt      DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@unique([userId, accountId])
+  @@index([userId])
+  @@index([accountId])
+}

@@ -1,101 +1,157 @@
-import Image from "next/image";
+import Link from 'next/link';
 
-export default function Home() {
+export default function HomePage() {
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <main>
+      {/* Header */}
+      <header className="relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg" />
+              <span className="ml-2 text-xl font-bold text-gray-900 dark:text-white">Meta AI Analytics</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <Link
+                href="/login"
+                className="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/register"
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+              >
+                Get Started
+              </Link>
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+      </header>
+
+      {/* Hero Section */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div className="text-center">
+          <h1 className="text-4xl tracking-tight font-extrabold text-gray-900 dark:text-white sm:text-5xl md:text-6xl">
+            <span className="block">Optimize your Meta Ads</span>
+            <span className="block text-blue-600">with AI-powered insights</span>
+          </h1>
+          <p className="mt-3 max-w-md mx-auto text-base text-gray-500 dark:text-gray-400 sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
+            Get deep insights into your Meta Ads performance, optimize your campaigns with AI recommendations, and boost your ROI with our advanced analytics platform.
+          </p>
+          <div className="mt-5 max-w-md mx-auto sm:flex sm:justify-center md:mt-8">
+            <div className="rounded-md shadow">
+              <Link
+                href="/register"
+                className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 md:py-4 md:text-lg md:px-10"
+              >
+                Start free trial
+              </Link>
+            </div>
+            <div className="mt-3 rounded-md shadow sm:mt-0 sm:ml-3">
+              <a
+                href="#features"
+                className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-blue-600 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:text-blue-400 dark:hover:bg-gray-700 md:py-4 md:text-lg md:px-10"
+              >
+                Learn more
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Feature Section */}
+      <div id="features" className="py-20 bg-gray-50 dark:bg-gray-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white sm:text-4xl">
+              Everything you need to optimize your ads
+            </h2>
+            <p className="mt-4 text-lg text-gray-500 dark:text-gray-400">
+              Our platform provides comprehensive tools and insights to help you make data-driven decisions.
+            </p>
+          </div>
+
+          <div className="mt-20">
+            <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+              {features.map((feature) => (
+                <div key={feature.title} className="pt-6">
+                  <div className="flow-root bg-white dark:bg-gray-900 rounded-lg px-6 pb-8">
+                    <div className="-mt-6">
+                      <div>
+                        <span className="inline-flex items-center justify-center p-3 bg-blue-600 rounded-md shadow-lg">
+                          {feature.icon}
+                        </span>
+                      </div>
+                      <h3 className="mt-8 text-lg font-medium text-gray-900 dark:text-white tracking-tight">
+                        {feature.title}
+                      </h3>
+                      <p className="mt-5 text-base text-gray-500 dark:text-gray-400">
+                        {feature.description}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="bg-white dark:bg-gray-900">
+        <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+          <div className="mt-8 border-t border-gray-200 dark:border-gray-800 pt-8 md:flex md:items-center md:justify-between">
+            <div className="flex space-x-6 md:order-2">
+              <a href="#" className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+                Terms
+              </a>
+              <a href="#" className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+                Privacy
+              </a>
+              <a href="#" className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+                Contact
+              </a>
+            </div>
+            <p className="mt-8 text-base text-gray-400 md:mt-0 md:order-1">
+              &copy; 2024 Meta AI Analytics. All rights reserved.
+            </p>
+          </div>
+        </div>
       </footer>
-    </div>
+    </main>
   );
 }
+
+const features = [
+  {
+    title: 'AI-Powered Insights',
+    description: 'Get intelligent recommendations and insights powered by advanced AI algorithms.',
+    icon: '🤖',
+  },
+  {
+    title: 'Real-time Analytics',
+    description: 'Monitor your campaign performance in real-time with detailed metrics and visualizations.',
+    icon: '📊',
+  },
+  {
+    title: 'Smart Optimization',
+    description: 'Automatically optimize your campaigns based on AI-driven performance analysis.',
+    icon: '🎯',
+  },
+  {
+    title: 'Custom Reports',
+    description: 'Generate comprehensive reports tailored to your specific needs and requirements.',
+    icon: '📑',
+  },
+  {
+    title: 'Budget Management',
+    description: 'Efficiently manage and optimize your ad spend across multiple campaigns.',
+    icon: '💰',
+  },
+  {
+    title: 'A/B Testing',
+    description: 'Test different ad variations and strategies to maximize your ROI.',
+    icon: '🔄',
+  },
+];
