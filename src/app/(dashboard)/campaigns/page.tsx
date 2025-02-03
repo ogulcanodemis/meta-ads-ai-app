@@ -43,6 +43,8 @@ interface ApiCampaignInsightStat {
   clicks: number;
   conversions: number;
   revenue: number;
+  hour_of_day?: number;
+  day_of_week?: number;
 }
 
 interface ApiCampaignInsight {
@@ -57,6 +59,57 @@ interface ApiCampaignInsight {
     roas: number;
     conversion_rate: number;
     daily_stats?: ApiCampaignInsightStat[];
+    // Temel metrikler
+    reach: number;
+    frequency: number;
+    unique_clicks: number;
+    unique_ctr: number;
+    cost_per_unique_click: number;
+    outbound_clicks: number;
+    outbound_clicks_ctr: number;
+    engagement_rate: number;
+    quality_ranking: string;
+    engagement_rate_ranking: string;
+    conversion_rate_ranking: string;
+    link_clicks: number;
+    page_engagement: number;
+    leads: number;
+    purchases: number;
+    cost_per_lead: number;
+    cost_per_purchase: number;
+    // Kalite metrikleri
+    quality_score: number | null;
+    ad_relevance_score: number | null;
+    landing_page_score: number | null;
+    // Hedefleme metrikleri
+    audience_size: number | null;
+    audience_overlap: number | null;
+    reach_estimate: number | null;
+    impression_share: number | null;
+    search_impression_share: number | null;
+    search_rank_lost_impression_share: number | null;
+    // Demografik metrikler
+    age_targeting_performance?: Array<{
+      age_range: string;
+      impressions: number;
+      clicks: number;
+      conversions: number;
+      ctr: number;
+    }>;
+    gender_targeting_performance?: Array<{
+      gender: string;
+      impressions: number;
+      clicks: number;
+      conversions: number;
+      ctr: number;
+    }>;
+    placement_performance?: Array<{
+      placement: string;
+      impressions: number;
+      clicks: number;
+      conversions: number;
+      ctr: number;
+    }>;
   }>;
   paging: any;
 }
@@ -86,6 +139,7 @@ interface Campaign {
   adAccountId: string;
   adAccountName: string;
   metrics: {
+    // Temel metrikler - Her zaman var
     impressions: number;
     clicks: number;
     spend: number;
@@ -109,6 +163,58 @@ interface Campaign {
     costPerLead: number;
     costPerPurchase: number;
     conversions: number;
+
+    // Kalite metrikleri - Opsiyonel
+    qualityScore: number | null;
+    adRelevanceScore: number | null;
+    landingPageScore: number | null;
+
+    // Hedefleme metrikleri - Opsiyonel
+    audienceSize: number | null;
+    audienceOverlap: number | null;
+    reachEstimate: number | null;
+    impressionShare: number | null;
+    searchImpressionShare: number | null;
+    searchRankLostImpressionShare: number | null;
+
+    // Demografik metrikler - Opsiyonel
+    ageTargetingPerformance: Array<{
+      ageRange: string;
+      impressions: number;
+      clicks: number;
+      conversions: number;
+      ctr: number;
+    }>;
+    genderTargetingPerformance: Array<{
+      gender: string;
+      impressions: number;
+      clicks: number;
+      conversions: number;
+      ctr: number;
+    }>;
+    placementPerformance: Array<{
+      placement: string;
+      impressions: number;
+      clicks: number;
+      conversions: number;
+      ctr: number;
+    }>;
+
+    // Zaman bazlı metrikler - Opsiyonel
+    hourlyPerformance?: Array<{
+      hour: number;
+      impressions: number;
+      clicks: number;
+      conversions: number;
+      ctr: number;
+    }>;
+    dailyPerformance?: Array<{
+      dayOfWeek: number;
+      impressions: number;
+      clicks: number;
+      conversions: number;
+      ctr: number;
+    }>;
     daily_stats?: Array<{
       date_start: string;
       spend: number;
@@ -310,6 +416,62 @@ export default function CampaignsPage() {
         throw new Error(response.error || 'Failed to fetch campaigns');
       }
 
+      const transformMetrics = (insights: ApiCampaignInsight['data'][0]) => {
+        // Ensure insights object exists
+        const data = insights || {};
+        
+        return {
+          // Temel metrikler - API'den gelenler
+          impressions: data.impressions || 0,
+          clicks: data.clicks || 0,
+          spend: data.spend ? parseFloat(data.spend) : 0,
+          ctr: data.ctr || 0,
+          cpc: data.cpc || 0,
+          reach: data.reach || 0,
+          frequency: data.frequency || 0,
+          uniqueClicks: data.unique_clicks || 0,
+          uniqueCtr: data.unique_ctr || 0,
+          costPerUniqueClick: data.cost_per_unique_click || 0,
+          outboundClicks: data.outbound_clicks || 0,
+          outboundClicksCtr: data.outbound_clicks_ctr || 0,
+          engagementRate: data.engagement_rate || 0,
+          qualityRanking: data.quality_ranking || 'UNKNOWN',
+          engagementRateRanking: data.engagement_rate_ranking || 'UNKNOWN',
+          conversionRateRanking: data.conversion_rate_ranking || 'UNKNOWN',
+          linkClicks: data.link_clicks || 0,
+          pageEngagement: data.page_engagement || 0,
+          leads: data.leads || 0,
+          purchases: data.purchases || 0,
+          costPerLead: data.cost_per_lead || 0,
+          costPerPurchase: data.cost_per_purchase || 0,
+          conversions: data.conversions || 0,
+
+          // Kalite metrikleri - Her zaman var olmalı
+          qualityScore: null,
+          adRelevanceScore: null,
+          landingPageScore: null,
+
+          // Hedefleme metrikleri - Her zaman var olmalı
+          audienceSize: null,
+          audienceOverlap: null,
+          reachEstimate: null,
+          impressionShare: null,
+          searchImpressionShare: null,
+          searchRankLostImpressionShare: null,
+
+          // Demografik metrikler - Her zaman var olmalı
+          ageTargetingPerformance: [],
+          genderTargetingPerformance: [],
+          placementPerformance: [],
+
+          // Zaman bazlı metrikler
+          daily_stats: data.daily_stats?.map(stat => ({
+            ...stat,
+            spend: parseFloat(stat.spend)
+          })) || []
+        };
+      };
+
       const transformedCampaigns = response.data.campaigns.map((campaign: ApiCampaign) => ({
         id: campaign.id,
         name: campaign.name,
@@ -321,20 +483,7 @@ export default function CampaignsPage() {
         end_time: campaign.end_time,
         adAccountId: campaign.adAccountId,
         adAccountName: campaign.adAccountName,
-        metrics: {
-          impressions: campaign.insights?.data?.[0]?.impressions || 0,
-          clicks: campaign.insights?.data?.[0]?.clicks || 0,
-          spend: campaign.insights?.data?.[0]?.spend ? parseFloat(campaign.insights.data[0].spend) : 0,
-          ctr: campaign.insights?.data?.[0]?.ctr || 0,
-          cpc: campaign.insights?.data?.[0]?.cpc || 0,
-          roas: campaign.insights?.data?.[0]?.roas || 0,
-          conversionRate: campaign.insights?.data?.[0]?.conversion_rate || 0,
-          conversions: campaign.insights?.data?.[0]?.conversions || 0,
-          daily_stats: campaign.insights?.data?.[0]?.daily_stats?.map(stat => ({
-            ...stat,
-            spend: parseFloat(stat.spend)
-          })) || []
-        }
+        metrics: transformMetrics(campaign.insights?.data?.[0] || {} as ApiCampaignInsight['data'][0])
       }));
 
       // Update cache with new data
@@ -370,24 +519,104 @@ export default function CampaignsPage() {
   }, []);
 
   const generateAIInsights = (campaign: Campaign) => {
-    // Simplified insights generation
     const insights: AIInsight[] = [];
-    
-    if (campaign.metrics.ctr < 1) {
+    const { metrics } = campaign;
+
+    // Performans Analizi
+    if (metrics.ctr < 1) {
       insights.push({
         type: 'warning',
-        message: 'Click-through rate is below average',
-        recommendation: 'Consider reviewing ad creative and targeting',
+        message: 'Düşük Tıklama Oranı',
+        recommendation: 'Reklam metninizi ve görselleri gözden geçirin. Hedef kitlenizi daraltmayı düşünün.',
+        impact: 'high'
+      });
+    }
+
+    if (metrics.cpc > 10) {
+      insights.push({
+        type: 'warning',
+        message: 'Yüksek Tıklama Maliyeti',
+        recommendation: 'Teklif stratejinizi ve hedefleme ayarlarınızı optimize edin.',
+        impact: 'high'
+      });
+    }
+
+    // Kalite Analizi
+    if (metrics.qualityScore && metrics.qualityScore < 5) {
+      insights.push({
+        type: 'warning',
+        message: 'Düşük Kalite Skoru',
+        recommendation: 'Reklam alaka düzeyini ve landing page deneyimini iyileştirin.',
+        impact: 'high'
+      });
+    }
+
+    if (metrics.adRelevanceScore && metrics.adRelevanceScore < 5) {
+      insights.push({
+        type: 'warning',
+        message: 'Düşük Reklam İlgi Skoru',
+        recommendation: 'Reklam içeriğinizi hedef kitlenizle daha iyi eşleştirin.',
         impact: 'medium'
       });
     }
 
-    if (campaign.metrics.cpc > 10) {
+    // Hedefleme Analizi
+    if (metrics.audienceOverlap && metrics.audienceOverlap > 30) {
+      insights.push({
+        type: 'info',
+        message: 'Yüksek Kitle Örtüşmesi',
+        recommendation: 'Kampanyalar arası rekabeti azaltmak için hedef kitleleri ayırın.',
+        impact: 'medium'
+      });
+    }
+
+    if (metrics.impressionShare && metrics.impressionShare < 20) {
       insights.push({
         type: 'warning',
-        message: 'Cost per click is high',
-        recommendation: 'Review bidding strategy and audience targeting',
-        impact: 'high'
+        message: 'Düşük Gösterim Payı',
+        recommendation: 'Bütçe ve teklif ayarlarınızı gözden geçirin.',
+        impact: 'medium'
+      });
+    }
+
+    // Demografik Analiz
+    if (metrics.ageTargetingPerformance && metrics.ageTargetingPerformance.length > 0) {
+      const bestAgeGroup = metrics.ageTargetingPerformance.reduce((prev, current) => 
+        (current.ctr > prev.ctr) ? current : prev
+      );
+
+      insights.push({
+        type: 'success',
+        message: `En İyi Performans: ${bestAgeGroup.ageRange} Yaş Grubu`,
+        recommendation: 'Bu yaş grubuna odaklanarak bütçenizi optimize edin.',
+        impact: 'medium'
+      });
+    }
+
+    if (metrics.genderTargetingPerformance && metrics.genderTargetingPerformance.length > 0) {
+      const bestGender = metrics.genderTargetingPerformance.reduce((prev, current) => 
+        (current.ctr > prev.ctr) ? current : prev
+      );
+
+      insights.push({
+        type: 'success',
+        message: `En İyi Performans: ${bestGender.gender} Cinsiyet Grubu`,
+        recommendation: 'Bu cinsiyet grubuna yönelik içerik stratejinizi güçlendirin.',
+        impact: 'medium'
+      });
+    }
+
+    // Yerleşim Analizi
+    if (metrics.placementPerformance && metrics.placementPerformance.length > 0) {
+      const bestPlacement = metrics.placementPerformance.reduce((prev, current) => 
+        (current.ctr > prev.ctr) ? current : prev
+      );
+
+      insights.push({
+        type: 'success',
+        message: `En İyi Performans: ${bestPlacement.placement} Yerleşimi`,
+        recommendation: 'Bu yerleşime daha fazla bütçe ayırın.',
+        impact: 'medium'
       });
     }
 
@@ -485,111 +714,191 @@ export default function CampaignsPage() {
 
   const renderDetailedAnalytics = (campaign: Campaign) => {
     const { metrics } = campaign;
-
-    // Helper function to format ranking text
-    const formatRanking = (ranking: string | undefined) => {
-      if (!ranking || ranking === 'UNKNOWN') return 'Not available';
-      return ranking.toLowerCase().replace('_', ' ');
-    };
-
+    
     return (
-      <Card className="mt-4">
-        <CardHeader>
-          <CardTitle>Detailed Analytics</CardTitle>
-          <CardDescription>Advanced performance metrics and rankings</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Reach & Frequency */}
-            <div className="space-y-4">
-              <h4 className="font-medium">Reach & Frequency</h4>
-              <div className="space-y-2">
-                <div>
-                  <span className="text-sm text-gray-500">Total Reach:</span>
-                  <p className="font-medium">{formatWithCommas(metrics.reach)}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-500">Frequency:</span>
-                  <p className="font-medium">{formatNumber(metrics.frequency)}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-500">Unique Clicks:</span>
-                  <p className="font-medium">{formatWithCommas(metrics.uniqueClicks)}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-500">Unique CTR:</span>
-                  <p className="font-medium">{formatNumber(metrics.uniqueCtr)}%</p>
-                </div>
+      <div className="space-y-4">
+        {/* Kalite Metrikleri - Her zaman göster */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Kalite Metrikleri</CardTitle>
+            <CardDescription>Reklam kalitesi ve performans göstergeleri</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-gray-800 rounded-lg">
+                <h5 className="text-sm text-gray-400">Kalite Skoru</h5>
+                <p className="text-2xl font-semibold">
+                  {metrics.qualityScore ? `${formatNumber(metrics.qualityScore)}/10` : 'API\'den alınamıyor'}
+                </p>
+                <p className="text-sm text-gray-400">Genel reklam kalitesi</p>
+              </div>
+              <div className="p-4 bg-gray-800 rounded-lg">
+                <h5 className="text-sm text-gray-400">Reklam İlgi Skoru</h5>
+                <p className="text-2xl font-semibold">
+                  {metrics.adRelevanceScore ? `${formatNumber(metrics.adRelevanceScore)}/10` : 'API\'den alınamıyor'}
+                </p>
+                <p className="text-sm text-gray-400">Hedef kitle uyumu</p>
+              </div>
+              <div className="p-4 bg-gray-800 rounded-lg">
+                <h5 className="text-sm text-gray-400">Landing Page Skoru</h5>
+                <p className="text-2xl font-semibold">
+                  {metrics.landingPageScore ? `${formatNumber(metrics.landingPageScore)}/10` : 'API\'den alınamıyor'}
+                </p>
+                <p className="text-sm text-gray-400">Varış sayfası deneyimi</p>
               </div>
             </div>
+          </CardContent>
+        </Card>
 
-            {/* Engagement Metrics */}
-            <div className="space-y-4">
-              <h4 className="font-medium">Engagement</h4>
-              <div className="space-y-2">
-                <div>
-                  <span className="text-sm text-gray-500">Link Clicks:</span>
-                  <p className="font-medium">{formatWithCommas(metrics.linkClicks)}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-500">Page Engagement:</span>
-                  <p className="font-medium">{formatWithCommas(metrics.pageEngagement)}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-500">Engagement Rate:</span>
-                  <p className="font-medium">{formatNumber(metrics.engagementRate)}%</p>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-500">Outbound CTR:</span>
-                  <p className="font-medium">{formatNumber(metrics.outboundClicksCtr)}%</p>
-                </div>
+        {/* Hedefleme Metrikleri - Her zaman göster */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Hedefleme Analizi</CardTitle>
+            <CardDescription>Kitle ve erişim metrikleri</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-gray-800 rounded-lg">
+                <h5 className="text-sm text-gray-400">Kitle Büyüklüğü</h5>
+                <p className="text-2xl font-semibold">
+                  {metrics.audienceSize ? formatWithCommas(metrics.audienceSize) : 'API\'den alınamıyor'}
+                </p>
+                <p className="text-sm text-gray-400">Potansiyel erişim</p>
+              </div>
+              <div className="p-4 bg-gray-800 rounded-lg">
+                <h5 className="text-sm text-gray-400">Kitle Örtüşmesi</h5>
+                <p className="text-2xl font-semibold">
+                  {metrics.audienceOverlap ? `${formatNumber(metrics.audienceOverlap)}%` : 'API\'den alınamıyor'}
+                </p>
+                <p className="text-sm text-gray-400">Diğer kampanyalarla örtüşme</p>
+              </div>
+              <div className="p-4 bg-gray-800 rounded-lg">
+                <h5 className="text-sm text-gray-400">Gösterim Payı</h5>
+                <p className="text-2xl font-semibold">
+                  {metrics.impressionShare ? `${formatNumber(metrics.impressionShare)}%` : 'API\'den alınamıyor'}
+                </p>
+                <p className="text-sm text-gray-400">Toplam gösterim payı</p>
               </div>
             </div>
+          </CardContent>
+        </Card>
 
-            {/* Conversion Metrics */}
-            <div className="space-y-4">
-              <h4 className="font-medium">Conversions</h4>
-              <div className="space-y-2">
-                <div>
-                  <span className="text-sm text-gray-500">Leads:</span>
-                  <p className="font-medium">{formatWithCommas(metrics.leads)}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-500">Purchases:</span>
-                  <p className="font-medium">{formatWithCommas(metrics.purchases)}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-500">Cost per Lead:</span>
-                  <p className="font-medium">${formatNumber(metrics.costPerLead)}</p>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-500">Cost per Purchase:</span>
-                  <p className="font-medium">${formatNumber(metrics.costPerPurchase)}</p>
-                </div>
-              </div>
-            </div>
+        {/* Demografik Performans - Her zaman göster */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Demografik Performans</CardTitle>
+            <CardDescription>Yaş ve cinsiyet bazlı analiz</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="age">
+              <TabsList>
+                <TabsTrigger value="age">Yaş Dağılımı</TabsTrigger>
+                <TabsTrigger value="gender">Cinsiyet Dağılımı</TabsTrigger>
+                <TabsTrigger value="placement">Yerleşim</TabsTrigger>
+              </TabsList>
 
-            {/* Rankings */}
-            <div className="md:col-span-3 mt-4">
-              <h4 className="font-medium mb-4">Campaign Rankings</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-gray-800 rounded-lg">
-                  <h5 className="text-sm text-gray-400">Quality Ranking</h5>
-                  <p className="text-lg font-semibold capitalize">{formatRanking(metrics.qualityRanking)}</p>
+              <TabsContent value="age">
+                <div className="relative overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-xs uppercase bg-gray-800">
+                      <tr>
+                        <th className="px-6 py-3">Yaş Aralığı</th>
+                        <th className="px-6 py-3">Gösterimler</th>
+                        <th className="px-6 py-3">Tıklamalar</th>
+                        <th className="px-6 py-3">CTR</th>
+                        <th className="px-6 py-3">Dönüşümler</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {metrics.ageTargetingPerformance?.length > 0 ? (
+                        metrics.ageTargetingPerformance.map((age) => (
+                          <tr key={age.ageRange} className="border-b border-gray-800">
+                            <td className="px-6 py-4 font-medium">{age.ageRange}</td>
+                            <td className="px-6 py-4">{formatWithCommas(age.impressions)}</td>
+                            <td className="px-6 py-4">{formatWithCommas(age.clicks)}</td>
+                            <td className="px-6 py-4">{formatNumber(age.ctr)}%</td>
+                            <td className="px-6 py-4">{formatWithCommas(age.conversions)}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-4 text-center">API'den yaş bazlı veri alınamıyor</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-                <div className="p-4 bg-gray-800 rounded-lg">
-                  <h5 className="text-sm text-gray-400">Engagement Ranking</h5>
-                  <p className="text-lg font-semibold capitalize">{formatRanking(metrics.engagementRateRanking)}</p>
+              </TabsContent>
+
+              <TabsContent value="gender">
+                <div className="relative overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-xs uppercase bg-gray-800">
+                      <tr>
+                        <th className="px-6 py-3">Cinsiyet</th>
+                        <th className="px-6 py-3">Gösterimler</th>
+                        <th className="px-6 py-3">Tıklamalar</th>
+                        <th className="px-6 py-3">CTR</th>
+                        <th className="px-6 py-3">Dönüşümler</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {metrics.genderTargetingPerformance?.length > 0 ? (
+                        metrics.genderTargetingPerformance.map((gender) => (
+                          <tr key={gender.gender} className="border-b border-gray-800">
+                            <td className="px-6 py-4 font-medium">{gender.gender}</td>
+                            <td className="px-6 py-4">{formatWithCommas(gender.impressions)}</td>
+                            <td className="px-6 py-4">{formatWithCommas(gender.clicks)}</td>
+                            <td className="px-6 py-4">{formatNumber(gender.ctr)}%</td>
+                            <td className="px-6 py-4">{formatWithCommas(gender.conversions)}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-4 text-center">API'den cinsiyet bazlı veri alınamıyor</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-                <div className="p-4 bg-gray-800 rounded-lg">
-                  <h5 className="text-sm text-gray-400">Conversion Ranking</h5>
-                  <p className="text-lg font-semibold capitalize">{formatRanking(metrics.conversionRateRanking)}</p>
+              </TabsContent>
+
+              <TabsContent value="placement">
+                <div className="relative overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-xs uppercase bg-gray-800">
+                      <tr>
+                        <th className="px-6 py-3">Yerleşim</th>
+                        <th className="px-6 py-3">Gösterimler</th>
+                        <th className="px-6 py-3">Tıklamalar</th>
+                        <th className="px-6 py-3">CTR</th>
+                        <th className="px-6 py-3">Dönüşümler</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {metrics.placementPerformance?.length > 0 ? (
+                        metrics.placementPerformance.map((placement) => (
+                          <tr key={placement.placement} className="border-b border-gray-800">
+                            <td className="px-6 py-4 font-medium">{placement.placement}</td>
+                            <td className="px-6 py-4">{formatWithCommas(placement.impressions)}</td>
+                            <td className="px-6 py-4">{formatWithCommas(placement.clicks)}</td>
+                            <td className="px-6 py-4">{formatNumber(placement.ctr)}%</td>
+                            <td className="px-6 py-4">{formatWithCommas(placement.conversions)}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-4 text-center">API'den yerleşim bazlı veri alınamıyor</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
     );
   };
 
@@ -950,10 +1259,11 @@ export default function CampaignsPage() {
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="name" />
                                     <YAxis />
-                                    <Tooltip formatter={(value, name) => {
-                                      if (name === 'ctr') return [formatNumber(value/1000) + '%', 'CTR'];
-                                      if (name === 'cpc') return ['$' + formatNumber(value/100), 'CPC'];
-                                      return [formatNumber(value), name];
+                                    <Tooltip formatter={(value: any, name: string) => {
+                                      const numValue = Number(value);
+                                      if (name === 'ctr') return [formatNumber(numValue/1000) + '%', 'CTR'];
+                                      if (name === 'cpc') return ['$' + formatNumber(numValue/100), 'CPC'];
+                                      return [formatNumber(numValue), name];
                                     }} />
                                     <Legend />
                                     <Bar dataKey="spend" name="Spend ($)" fill="#8884d8" />
