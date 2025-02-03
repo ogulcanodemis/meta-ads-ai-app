@@ -147,7 +147,11 @@ export async function fetchWithAuth<T = any>(endpoint: string, options: RequestI
       throw new Error('No authentication token found');
     }
 
-    const response = await fetch(`/api${endpoint}`, {
+    // Remove leading /api if present to prevent double /api prefix
+    const cleanEndpoint = endpoint.startsWith('/api/') ? endpoint.substring(4) : endpoint;
+    const url = `/api/${cleanEndpoint}`;
+
+    const response = await fetch(url, {
       ...options,
       headers: {
         ...options.headers,

@@ -76,7 +76,7 @@ export default function SettingsPage() {
       setError(null);
       console.log('Fetching settings...');
       
-      const response = await fetchWithAuth('/api/settings');
+      const response = await fetchWithAuth('/settings');
       console.log('Settings response:', response);
 
       if (response.error) {
@@ -108,7 +108,7 @@ export default function SettingsPage() {
       setError(null);
       console.log('Saving settings:', settings);
 
-      const response = await fetchWithAuth('/api/settings', {
+      const response = await fetchWithAuth('/settings', {
         method: 'PUT',
         body: JSON.stringify(settings),
       });
@@ -139,7 +139,7 @@ export default function SettingsPage() {
       setError(null);
       console.log('Testing connection...');
 
-      const response = await fetchWithAuth('/api/meta/test', {
+      const response = await fetchWithAuth('/meta/test', {
         method: 'POST',
         body: JSON.stringify({ token: settings.metaApiToken }),
       });
