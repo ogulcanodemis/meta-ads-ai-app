@@ -55,7 +55,7 @@ const DEFAULT_SETTINGS: Settings = {
     cpc: 1,
     ctr: 1
   },
-  aiSuggestions: true
+  aiSuggestions: true,
 };
 
 export default function SettingsPage() {
@@ -67,6 +67,11 @@ export default function SettingsPage() {
   const [isTestingApi, setIsTestingApi] = useState(false);
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      window.location.href = '/login';
+      return;
+    }
     fetchSettings();
   }, []);
 
@@ -527,84 +532,86 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-white mb-6">Settings</h1>
+    <div className="container mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-2xl font-bold mb-8">Settings</h1>
 
-      {error && (
-        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-          {error}
-        </div>
-      )}
-
-      {successMessage && (
-        <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
-          {successMessage}
-        </div>
-      )}
-
-      <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
-        <nav className="flex space-x-8" aria-label="Settings tabs">
-          <button
-            onClick={() => setActiveTab('meta')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'meta'
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-            }`}
-          >
-            Meta API
-          </button>
-          <button
-            onClick={() => setActiveTab('app')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'app'
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-            }`}
-          >
-            App Settings
-          </button>
-          <button
-            onClick={() => setActiveTab('notifications')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'notifications'
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-            }`}
-          >
-            Notifications
-          </button>
-          <button
-            onClick={() => setActiveTab('ai')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'ai'
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-            }`}
-          >
-            AI Settings
-          </button>
-        </nav>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-          {activeTab === 'meta' && renderMetaSettings()}
-          {activeTab === 'app' && renderAppSettings()}
-          {activeTab === 'notifications' && renderNotificationSettings()}
-          {activeTab === 'ai' && renderAISettings()}
-
-          <div className="mt-6 flex justify-end">
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
-            >
-              {isLoading ? 'Saving...' : 'Save Settings'}
-            </button>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+          <div className="border-b border-gray-200 dark:border-gray-700">
+            <nav className="flex space-x-4 px-4" aria-label="Tabs">
+              <button
+                onClick={() => setActiveTab('meta')}
+                className={`px-3 py-2 text-sm font-medium rounded-md ${
+                  activeTab === 'meta'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-100'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+              >
+                Meta API
+              </button>
+              <button
+                onClick={() => setActiveTab('app')}
+                className={`px-3 py-2 text-sm font-medium rounded-md ${
+                  activeTab === 'app'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-100'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+              >
+                App Settings
+              </button>
+              <button
+                onClick={() => setActiveTab('notifications')}
+                className={`px-3 py-2 text-sm font-medium rounded-md ${
+                  activeTab === 'notifications'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-100'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+              >
+                Notifications
+              </button>
+              <button
+                onClick={() => setActiveTab('ai')}
+                className={`px-3 py-2 text-sm font-medium rounded-md ${
+                  activeTab === 'ai'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-100'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+              >
+                AI Settings
+              </button>
+            </nav>
           </div>
+
+          <form onSubmit={handleSubmit} className="p-6">
+            {error && (
+              <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md">
+                {error}
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="mb-4 p-4 bg-green-100 text-green-700 rounded-md">
+                {successMessage}
+              </div>
+            )}
+
+            {activeTab === 'meta' && renderMetaSettings()}
+            {activeTab === 'app' && renderAppSettings()}
+            {activeTab === 'notifications' && renderNotificationSettings()}
+            {activeTab === 'ai' && renderAISettings()}
+
+            <div className="mt-6 flex justify-end">
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+              >
+                {isLoading ? 'Saving...' : 'Save Settings'}
+              </button>
+            </div>
+          </form>
         </div>
-      </form>
+      </div>
     </div>
   );
 } 

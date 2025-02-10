@@ -25,6 +25,7 @@ export async function GET(request: Request) {
 
     // Return settings
     return NextResponse.json({
+      // Meta settings
       metaApiToken: metaAccount?.accessToken || '',
       metaAccountName: metaAccount?.name || '',
       lastSynced: metaAccount?.lastSyncedAt || null,
@@ -32,10 +33,7 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error('Settings error:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch settings' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch settings' }, { status: 500 });
   }
 }
 
@@ -50,56 +48,46 @@ export async function PUT(request: Request) {
     const data = await request.json();
     const { metaApiToken } = data;
 
-    if (!metaApiToken) {
-      return NextResponse.json(
-        { error: 'Meta API token is required' },
-        { status: 400 }
-      );
-    }
-
-    // Find existing Meta account
-    const existingAccount = await prisma.metaAccount.findFirst({
-      where: {
-        userId: user.id,
-        status: 'active'
-      }
-    });
-
-    let updatedAccount;
-    if (existingAccount) {
-      // Update existing account
-      updatedAccount = await prisma.metaAccount.update({
-        where: { id: existingAccount.id },
-        data: {
-          accessToken: metaApiToken,
-          lastSyncedAt: new Date(),
-        },
-      });
-    } else {
-      // Create new account
-      updatedAccount = await prisma.metaAccount.create({
-        data: {
+    // Update Meta account if token provided
+    let metaAccount;
+    if (metaApiToken) {
+      const existingMetaAccount = await prisma.metaAccount.findFirst({
+        where: {
           userId: user.id,
-          accessToken: metaApiToken,
-          status: 'active',
-          accountId: 'pending', // Will be updated when testing connection
-          name: 'Pending Connection', // Will be updated when testing connection
-        },
+          status: 'active'
+        }
       });
+
+      if (existingMetaAccount) {
+        metaAccount = await prisma.metaAccount.update({
+          where: { id: existingMetaAccount.id },
+          data: {
+            accessToken: metaApiToken,
+            lastSyncedAt: new Date(),
+          },
+        });
+      } else {
+        metaAccount = await prisma.metaAccount.create({
+          data: {
+            userId: user.id,
+            accessToken: metaApiToken,
+            status: 'active',
+            accountId: 'pending',
+            name: 'Pending Connection',
+          },
+        });
+      }
     }
 
     // Return updated settings
     return NextResponse.json({
-      metaApiToken: updatedAccount.accessToken,
-      metaAccountName: updatedAccount.name,
-      lastSynced: updatedAccount.lastSyncedAt,
+      metaApiToken: metaAccount?.accessToken || '',
+      metaAccountName: metaAccount?.name || '',
+      lastSynced: metaAccount?.lastSyncedAt || null,
       updatedAt: new Date().toISOString(),
     });
   } catch (error) {
     console.error('Settings update error:', error);
-    return NextResponse.json(
-      { error: 'Failed to update settings' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 });
   }
 } 

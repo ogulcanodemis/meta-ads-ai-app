@@ -141,9 +141,21 @@ export function getCurrentUser() {
 // Authenticated API request helper
 export async function fetchWithAuth<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
   try {
-    const token = localStorage.getItem('token');
+    let token;
+    
+    if (typeof window !== 'undefined') {
+      token = localStorage.getItem('token');
+    } else {
+      // Server-side'da çalışırken cookie'den token'ı al
+      const cookies = require('next/headers').cookies;
+      const cookieStore = cookies();
+      token = cookieStore.get('auth_token')?.value;
+    }
     
     if (!token) {
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
       throw new Error('No authentication token found');
     }
 
@@ -158,6 +170,7 @@ export async function fetchWithAuth<T = any>(endpoint: string, options: RequestI
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
+      credentials: 'include', // Cookie'leri de gönder
     });
 
     if (!response.ok) {
@@ -166,6 +179,11 @@ export async function fetchWithAuth<T = any>(endpoint: string, options: RequestI
       try {
         const errorData = await response.json();
         errorMessage = errorData.message || errorData.error || errorMessage;
+        
+        // 401 durumunda login sayfasına yönlendir
+        if (response.status === 401 && typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
       } catch (e) {
         // If parsing fails, use status text
         errorMessage = response.statusText || errorMessage;

@@ -71,20 +71,23 @@ export async function validateMetaApiToken(accessToken: string): Promise<boolean
 }
 
 export async function syncCampaigns(userId: string) {
-  const userSettings = await prisma.userSettings.findUnique({
-    where: { userId },
+  const metaAccount = await prisma.metaAccount.findFirst({
+    where: { 
+      userId,
+      status: 'active'
+    },
   });
 
-  if (!userSettings?.metaApiToken) {
+  if (!metaAccount?.accessToken) {
     throw new Error('Meta API token not found');
   }
 
-  const campaigns = await fetchCampaigns(userSettings.metaApiToken);
+  const campaigns = await fetchCampaigns(metaAccount.accessToken);
 
   // Store campaigns in database
   for (const campaign of campaigns.data) {
     const insights = await fetchCampaignInsights(
-      userSettings.metaApiToken,
+      metaAccount.accessToken,
       campaign.id
     );
 
@@ -106,6 +109,7 @@ export async function syncCampaigns(userId: string) {
         startTime: campaign.start_time,
         endTime: campaign.end_time,
         lastUpdated: new Date(),
+        metaAccountId: metaAccount.id
       },
       update: {
         name: campaign.name,
@@ -116,6 +120,7 @@ export async function syncCampaigns(userId: string) {
         startTime: campaign.start_time,
         endTime: campaign.end_time,
         lastUpdated: new Date(),
+        metaAccountId: metaAccount.id
       },
     });
   }
