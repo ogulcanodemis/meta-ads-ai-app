@@ -33,6 +33,7 @@ model User {
   notifications   Notification[]
   reports         Report[]
   settings        UserSettings?
+  automationRules AutomationRule[]
 }
 
 model UserSettings {
@@ -229,4 +230,35 @@ model HubspotDeal {
 
   @@unique([hubspotAccountId, hubspotId])
   @@index([stage])
+}
+
+model AutomationRule {
+  id          String      @id @default(cuid())
+  name        String
+  type        String      // matching, trigger, workflow, sync
+  status      String      @default("active")
+  conditions  Json        // Array of conditions
+  actions     Json        // Array of actions
+  lastRun     DateTime?
+  nextRun     DateTime?
+  logs        AutomationLog[]
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([type])
+}
+
+model AutomationLog {
+  id          String        @id @default(cuid())
+  ruleId      String
+  rule        AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  status      String        // success, error, warning
+  message     String
+  details     Json?
+  createdAt   DateTime      @default(now())
+
+  @@index([ruleId])
 }

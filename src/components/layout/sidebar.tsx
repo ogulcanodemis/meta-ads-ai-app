@@ -33,6 +33,7 @@ const Sidebar = () => {
     { label: 'Deals', href: '/hubspot/deals' as Route },
     { label: 'Meta Ads Integration', href: '/hubspot/meta-ads' as Route },
     { label: 'Automation', href: '/hubspot/automation' as Route },
+    { label: 'Analytics & Reports', href: '/hubspot/analytics' as Route },
   ];
 
   return (
