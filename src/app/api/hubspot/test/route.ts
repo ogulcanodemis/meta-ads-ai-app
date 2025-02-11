@@ -1,96 +1,175 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { authenticateTokenWithPrisma } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    const user = await authenticateTokenWithPrisma(request);
+    // Authenticate user
+    const user = await authenticateTokenWithPrisma(req);
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
-    const data = await request.json();
-    const { authType, privateKey, accessToken } = data;
+    // Get the token from request body
+    const body = await req.json();
+    const { token, authType = 'oauth' } = body;
 
-    if (!privateKey && !accessToken) {
+    if (!token) {
       return NextResponse.json(
-        { error: 'Either private key or access token is required' },
+        { error: 'HubSpot token is required' },
         { status: 400 }
       );
     }
 
-    // Test HubSpot connection based on auth type
-    const testEndpoint = authType === 'private'
-      ? 'https://api.hubapi.com/crm/v3/objects/contacts'
-      : 'https://api.hubapi.com/oauth/v1/access-tokens/';
+    // Test HubSpot API connection and get account info
+    try {
+      let accountData: any = {};
+      
+      // Get account info based on auth type
+      if (authType === 'oauth') {
+        const accountResponse = await fetch(
+          'https://api.hubapi.com/oauth/v1/access-tokens/'+token,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
 
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
+        accountData = await accountResponse.json();
+        console.log('HubSpot OAuth account data:', accountData);
 
-    if (authType === 'private') {
-      headers['Authorization'] = `Bearer ${privateKey}`;
-    } else {
-      headers['Authorization'] = `Bearer ${accessToken}`;
-    }
+        if (!accountResponse.ok) {
+          return NextResponse.json(
+            { 
+              error: accountData.message || 'Invalid HubSpot token',
+              details: accountData
+            },
+            { status: 400 }
+          );
+        }
+      } else {
+        // For private app, get account info from /account-info/v3/details
+        const accountResponse = await fetch(
+          'https://api.hubapi.com/account-info/v3/details',
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
 
-    const response = await fetch(testEndpoint, {
-      method: 'GET',
-      headers,
-    });
+        accountData = await accountResponse.json();
+        console.log('HubSpot Private App account data:', accountData);
 
-    if (!response.ok) {
-      throw new Error('Failed to connect to HubSpot');
-    }
+        if (!accountResponse.ok) {
+          return NextResponse.json(
+            { 
+              error: accountData.message || 'Invalid HubSpot token',
+              details: accountData
+            },
+            { status: 400 }
+          );
+        }
 
-    const accountInfo = await response.json();
-
-    // Find existing HubSpot account
-    const existingAccount = await prisma.hubspotAccount.findFirst({
-      where: {
-        userId: user.id,
-        status: 'active'
+        // Map private app response to match OAuth response structure
+        accountData = {
+          hub_id: accountData.portalId,
+          hub_domain: accountData.uiDomain || 'app.hubspot.com',
+          account_type: accountData.accountType,
+          timezone: accountData.timeZone
+        };
       }
-    });
 
-    let updatedAccount;
-    if (existingAccount) {
-      // Update existing account
-      updatedAccount = await prisma.hubspotAccount.update({
-        where: { id: existingAccount.id },
-        data: {
-          accessToken: authType === 'oauth' ? accessToken : null,
-          privateKey: authType === 'private' ? privateKey : null,
-          authType,
-          lastSyncedAt: new Date(),
+      // Then verify CRM access
+      const response = await fetch(
+        'https://api.hubapi.com/crm/v3/objects/contacts?limit=1',
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return NextResponse.json(
+          { 
+            error: data.message || 'Could not access CRM data',
+            details: data
+          },
+          { status: 400 }
+        );
+      }
+
+      // Generate a meaningful account name
+      const accountName = accountData.account_type ? 
+        `HubSpot ${accountData.account_type.charAt(0) + accountData.account_type.slice(1).toLowerCase()} Account` : 
+        'HubSpot Account';
+
+      // If successful, create or update HubSpot account
+      const hubspotAccount = await prisma.hubspotAccount.upsert({
+        where: {
+          userId_accountId: {
+            userId: user.id,
+            accountId: accountData.hub_id?.toString() || 'pending',
+          }
         },
-      });
-    } else {
-      // Create new account
-      updatedAccount = await prisma.hubspotAccount.create({
-        data: {
+        create: {
+          accountId: accountData.hub_id?.toString() || 'pending',
+          name: accountName,
+          appId: authType === 'oauth' ? token : null,
+          clientSecret: authType === 'oauth' ? token : null,
+          privateKey: authType === 'private' ? token : null,
+          authType,
           userId: user.id,
-          accessToken: authType === 'oauth' ? accessToken : null,
-          privateKey: authType === 'private' ? privateKey : null,
-          authType,
+          permissions: ['contacts', 'deals'],
+          lastSyncedAt: new Date(),
           status: 'active',
-          accountId: accountInfo.portalId?.toString() || 'pending',
-          name: accountInfo.portalName || 'HubSpot Account',
+        },
+        update: {
+          name: accountName,
+          appId: authType === 'oauth' ? token : null,
+          clientSecret: authType === 'oauth' ? token : null,
+          privateKey: authType === 'private' ? token : null,
+          authType,
+          permissions: ['contacts', 'deals'],
+          lastSyncedAt: new Date(),
+          status: 'active',
         },
       });
-    }
 
-    return NextResponse.json({
-      success: true,
-      account: {
-        name: updatedAccount.name,
-        lastSynced: updatedAccount.lastSyncedAt,
-      },
-    });
+      return NextResponse.json({
+        message: 'Successfully connected to HubSpot API',
+        account: {
+          id: hubspotAccount.id,
+          name: hubspotAccount.name,
+          portalId: accountData.hub_id,
+        },
+      });
+    } catch (apiError) {
+      console.error('HubSpot API error:', apiError);
+      return NextResponse.json(
+        { 
+          error: 'Failed to connect to HubSpot API',
+          details: apiError instanceof Error ? apiError.message : 'Unknown error'
+        },
+        { status: 500 }
+      );
+    }
   } catch (error) {
-    console.error('HubSpot test error:', error);
+    console.error('Error testing HubSpot API connection:', error);
     return NextResponse.json(
-      { error: 'Failed to connect to HubSpot' },
+      { 
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

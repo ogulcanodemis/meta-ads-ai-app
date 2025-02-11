@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,155 +8,178 @@ datasource db {
 }
 
 model User {
-  id                String         @id @default(cuid())
-  email             String         @unique
-  name              String?
-  password          String
-  company           String?
-  role              String         @default("user")
-  image             String?
-  position          String?        // Job position/title
-  bio               String?        // User biography
-  expertise         String[]       // Areas of expertise
-  socialLinks       Json?          // Social media links
-  phoneNumber       String?
-  address           String?
-  timezone          String?        @default("UTC")
-  lastLoginAt       DateTime?
-  isEmailVerified   Boolean        @default(false)
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
-  settings          UserSettings?
-  campaigns         Campaign[]
-  notifications     Notification[]
-  reports           Report[]       // Reports created by user
-  activities        Activity[]     // User activities
-  metaAccounts      MetaAccount[]  // Connected Meta Business accounts
+  id              String          @id @default(cuid())
+  email           String          @unique
+  name            String?
+  password        String
+  company         String?
+  role            String          @default("user")
+  image           String?
+  position        String?
+  bio             String?
+  expertise       String[]
+  socialLinks     Json?
+  phoneNumber     String?
+  address         String?
+  timezone        String?         @default("UTC")
+  lastLoginAt     DateTime?
+  isEmailVerified Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  activities      Activity[]
+  campaigns       Campaign[]
+  hubspotAccounts HubspotAccount[]
+  metaAccounts    MetaAccount[]
+  notifications   Notification[]
+  reports         Report[]
+  settings        UserSettings?
 }
 
 model UserSettings {
   id                 String   @id @default(cuid())
-  userId            String   @unique
-  theme             String   @default("system")
-  language          String   @default("en")
-  timezone          String   @default("UTC")
+  userId             String   @unique
+  theme              String   @default("system")
+  language           String   @default("en")
+  timezone           String   @default("UTC")
   emailNotifications Boolean  @default(true)
   pushNotifications  Boolean  @default(true)
   marketingEmails    Boolean  @default(false)
-  apiKey            String?
-  webhookUrl        String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  apiKey             String?
+  webhookUrl         String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Campaign {
-  id          String   @id @default(cuid())
-  userId      String
-  campaignId  String
-  name        String
-  status      String
-  objective   String?
-  spendCap    Float?
-  dailyBudget Float?
-  startTime   DateTime?
-  endTime     DateTime?
-  lastUpdated DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  adSets      AdSet[]
-  analytics   Analytics[]
-  reports     Report[]
-  activities  Activity[]
-  metaAccount MetaAccount @relation(fields: [metaAccountId], references: [id])
+  id            String      @id @default(cuid())
+  userId        String
+  campaignId    String
+  name          String
+  status        String
+  objective     String?
+  spendCap      Float?
+  dailyBudget   Float?
+  startTime     DateTime?
+  endTime       DateTime?
+  lastUpdated   DateTime    @default(now())
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
   metaAccountId String
+  activities    Activity[]
+  adSets        AdSet[]
+  analytics     Analytics[]
+  metaAccount   MetaAccount @relation(fields: [metaAccountId], references: [id])
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reports       Report[]
 
   @@unique([userId, campaignId])
   @@index([userId])
 }
 
 model AdSet {
-  id                String    @id @default(cuid())
-  name              String
-  campaignId        String
-  campaign          Campaign  @relation(fields: [campaignId], references: [id])
-  status            String
-  budget            Float?
-  bidStrategy       String?
-  targeting         Json?
-  metrics           Json?
-  startDate         DateTime
-  endDate           DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  name        String
+  campaignId  String
+  status      String
+  budget      Float?
+  bidStrategy String?
+  targeting   Json?
+  metrics     Json?
+  startDate   DateTime
+  endDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  campaign    Campaign  @relation(fields: [campaignId], references: [id])
 }
 
 model Analytics {
-  id                String    @id @default(cuid())
-  campaignId        String
-  campaign          Campaign  @relation(fields: [campaignId], references: [id])
-  data              Json      // Raw analytics data
-  metrics           Json      // Processed metrics
-  insights          Json?     // AI-generated insights
-  recommendations   Json?     // AI-generated recommendations
-  date              DateTime
-  createdAt         DateTime  @default(now())
+  id              String   @id @default(cuid())
+  campaignId      String
+  data            Json
+  metrics         Json
+  insights        Json?
+  recommendations Json?
+  date            DateTime
+  createdAt       DateTime @default(now())
+  campaign        Campaign @relation(fields: [campaignId], references: [id])
 }
 
 model Report {
-  id                String    @id @default(cuid())
-  name              String
-  type              String    // performance, insights, custom
-  content           Json
-  format            String    @default("pdf") // pdf, csv, xlsx
-  schedule          Json?     // Report scheduling settings
-  lastGenerated     DateTime?
-  campaignId        String
-  campaign          Campaign  @relation(fields: [campaignId], references: [id])
-  userId            String
-  user              User      @relation(fields: [userId], references: [id])
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  name          String
+  type          String
+  content       Json
+  format        String    @default("pdf")
+  schedule      Json?
+  lastGenerated DateTime?
+  campaignId    String
+  userId        String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  campaign      Campaign  @relation(fields: [campaignId], references: [id])
+  user          User      @relation(fields: [userId], references: [id])
 }
 
 model Notification {
-  id                String    @id @default(cuid())
-  title             String
-  message           String
-  type              String    // info, success, warning, error
-  category          String    // campaign, report, system, etc.
-  read              Boolean   @default(false)
-  actionUrl         String?   // URL to redirect when clicked
-  userId            String
-  user              User      @relation(fields: [userId], references: [id])
-  createdAt         DateTime  @default(now())
-  expiresAt         DateTime?
+  id        String    @id @default(cuid())
+  title     String
+  message   String
+  type      String
+  category  String
+  read      Boolean   @default(false)
+  actionUrl String?
+  userId    String
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+  user      User      @relation(fields: [userId], references: [id])
 }
 
 model Activity {
-  id                String    @id @default(cuid())
-  type              String    // login, campaign_update, report_generation, etc.
-  description       String
-  metadata          Json?     // Additional activity data
-  userId            String
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  campaignId        String?
-  campaign          Campaign?   @relation(fields: [campaignId], references: [id])
-  createdAt         DateTime  @default(now())
+  id          String    @id @default(cuid())
+  type        String
+  description String
+  metadata    Json?
+  userId      String
+  campaignId  String?
+  createdAt   DateTime  @default(now())
+  campaign    Campaign? @relation(fields: [campaignId], references: [id])
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model MetaAccount {
+  id           String     @id @default(cuid())
+  name         String?
+  accountId    String
+  accessToken  String
+  status       String     @default("active")
+  permissions  String[]
+  userId       String
+  lastSyncedAt DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  campaigns    Campaign[]
+  user         User       @relation(fields: [userId], references: [id])
+
+  @@unique([userId, accountId])
+  @@index([userId])
+  @@index([accountId])
+}
+
+model HubspotAccount {
   id                String     @id @default(cuid())
   name              String?
-  accountId         String     // Meta Business Account ID
-  accessToken       String
+  accountId         String     // HubSpot Portal ID
+  appId             String?    // OAuth App ID
+  clientSecret      String?    // OAuth Client Secret
+  privateKey        String?    // Private App Key
+  authType          String     @default("oauth") // oauth or private
   status            String     @default("active")
   permissions       String[]   // Granted permissions
   userId            String
   user              User       @relation(fields: [userId], references: [id])
-  campaigns         Campaign[]
+  contacts          HubspotContact[]
+  deals             HubspotDeal[]
   lastSyncedAt      DateTime?
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
@@ -170,4 +187,46 @@ model MetaAccount {
   @@unique([userId, accountId])
   @@index([userId])
   @@index([accountId])
+}
+
+model HubspotContact {
+  id                String     @id @default(cuid())
+  hubspotId         String     // HubSpot Contact ID
+  email             String
+  firstName         String?
+  lastName          String?
+  phone             String?
+  company           String?
+  jobTitle          String?
+  lifecycle_stage   String?
+  properties        Json?      // Additional properties
+  hubspotAccountId  String
+  hubspotAccount    HubspotAccount @relation(fields: [hubspotAccountId], references: [id])
+  deals             HubspotDeal[]
+  lastSyncedAt      DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@unique([hubspotAccountId, hubspotId])
+  @@index([email])
+}
+
+model HubspotDeal {
+  id                String     @id @default(cuid())
+  hubspotId         String     // HubSpot Deal ID
+  name              String
+  stage             String
+  amount            Float?
+  closeDate         DateTime?
+  pipeline          String?
+  properties        Json?      // Additional properties
+  hubspotAccountId  String
+  hubspotAccount    HubspotAccount @relation(fields: [hubspotAccountId], references: [id])
+  contacts          HubspotContact[]
+  lastSyncedAt      DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@unique([hubspotAccountId, hubspotId])
+  @@index([stage])
 }

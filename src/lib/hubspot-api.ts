@@ -1,13 +1,74 @@
 import { prisma } from '@/lib/prisma';
+import type {
+  HubspotApiError,
+  HubspotContact,
+  HubspotDeal,
+  HubspotContactsResponse,
+  HubspotDealsResponse,
+} from '@/types/hubspot';
 
-interface HubspotApiError {
-  status: string;
-  message: string;
-  correlationId: string;
-  category: string;
+const HUBSPOT_API_URL = 'https://api.hubapi.com';
+
+async function fetchHubspotApi<T>(
+  endpoint: string,
+  token: string,
+  options: RequestInit = {}
+): Promise<T> {
+  try {
+    const response = await fetch(`${HUBSPOT_API_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+
+    if (!response.ok) {
+      let errorMessage = 'HubSpot API Error';
+      try {
+        const error = await response.json() as HubspotApiError;
+        errorMessage = error.message || errorMessage;
+      } catch {
+        errorMessage = `${errorMessage}: ${response.statusText}`;
+      }
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    if (!data) {
+      throw new Error('Invalid response from HubSpot API');
+    }
+
+    return data as T;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Unknown error occurred while fetching from HubSpot API');
+  }
 }
 
-export async function fetchContacts(userId: string) {
+async function getOAuthAccessToken(clientSecret: string): Promise<string> {
+  try {
+    const response = await fetch(`${HUBSPOT_API_URL}/oauth/v1/access-tokens/${clientSecret}`);
+    if (!response.ok) {
+      throw new Error('Failed to get OAuth access token');
+    }
+    const data = await response.json();
+    if (!data?.access_token) {
+      throw new Error('Invalid OAuth response: No access token found');
+    }
+    return data.access_token;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Failed to authenticate with HubSpot: ${error.message}`);
+    }
+    throw new Error('Failed to authenticate with HubSpot');
+  }
+}
+
+export async function fetchContacts(userId: string): Promise<HubspotContactsResponse> {
   try {
     const account = await prisma.hubspotAccount.findFirst({
       where: { 
@@ -20,31 +81,80 @@ export async function fetchContacts(userId: string) {
       throw new Error('HubSpot account not found');
     }
 
-    const token = account.authType === 'private' ? account.privateKey : account.accessToken;
-    
-    const response = await fetch(
-      'https://api.hubapi.com/crm/v3/objects/contacts',
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+    let token;
+    if (account.authType === 'private') {
+      token = account.privateKey;
+    } else {
+      if (!account.clientSecret) {
+        throw new Error('No client secret found for OAuth authentication');
       }
-    );
-
-    if (!response.ok) {
-      const error = (await response.json()) as HubspotApiError;
-      throw new Error(`HubSpot API Error: ${error.message}`);
+      token = await getOAuthAccessToken(account.clientSecret);
     }
 
-    return await response.json();
+    if (!token) {
+      throw new Error('No valid authentication token found');
+    }
+    
+    const response = await fetchHubspotApi<HubspotContactsResponse>(
+      '/crm/v3/objects/contacts?properties=email,firstname,lastname,phone,company,jobtitle,lifecyclestage&limit=100',
+      token
+    );
+
+    if (!response?.results) {
+      throw new Error('Invalid response format from HubSpot API');
+    }
+
+    // Store contacts in database
+    const contacts = response.results;
+    for (const contact of contacts) {
+      await prisma.hubspotContact.upsert({
+        where: {
+          hubspotAccountId_hubspotId: {
+            hubspotAccountId: account.id,
+            hubspotId: contact.id,
+          },
+        },
+        create: {
+          hubspotId: contact.id,
+          email: contact.properties.email || '',
+          firstName: contact.properties.firstname,
+          lastName: contact.properties.lastname,
+          phone: contact.properties.phone,
+          company: contact.properties.company,
+          jobTitle: contact.properties.jobtitle,
+          lifecycle_stage: contact.properties.lifecyclestage,
+          properties: contact.properties,
+          lastSyncedAt: new Date(),
+          hubspotAccount: {
+            connect: {
+              id: account.id
+            }
+          }
+        },
+        update: {
+          email: contact.properties.email || '',
+          firstName: contact.properties.firstname,
+          lastName: contact.properties.lastname,
+          phone: contact.properties.phone,
+          company: contact.properties.company,
+          jobTitle: contact.properties.jobtitle,
+          lifecycle_stage: contact.properties.lifecyclestage,
+          properties: contact.properties,
+          lastSyncedAt: new Date(),
+        },
+      });
+    }
+
+    return response;
   } catch (error) {
-    console.error('Error fetching contacts:', error);
-    throw error;
+    if (error instanceof Error) {
+      throw new Error(`Failed to fetch contacts: ${error.message}`);
+    }
+    throw new Error('Failed to fetch contacts');
   }
 }
 
-export async function fetchDeals(userId: string) {
+export async function fetchDeals(userId: string): Promise<HubspotDealsResponse> {
   try {
     const account = await prisma.hubspotAccount.findFirst({
       where: { 
@@ -57,37 +167,81 @@ export async function fetchDeals(userId: string) {
       throw new Error('HubSpot account not found');
     }
 
-    const token = account.authType === 'private' ? account.privateKey : account.accessToken;
-    
-    const response = await fetch(
-      'https://api.hubapi.com/crm/v3/objects/deals',
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+    let token;
+    if (account.authType === 'private') {
+      token = account.privateKey;
+    } else {
+      if (!account.clientSecret) {
+        throw new Error('No client secret found for OAuth authentication');
       }
-    );
-
-    if (!response.ok) {
-      const error = (await response.json()) as HubspotApiError;
-      throw new Error(`HubSpot API Error: ${error.message}`);
+      token = await getOAuthAccessToken(account.clientSecret);
     }
 
-    return await response.json();
+    if (!token) {
+      throw new Error('No valid authentication token found');
+    }
+    
+    const response = await fetchHubspotApi<HubspotDealsResponse>(
+      '/crm/v3/objects/deals?properties=dealname,dealstage,amount,closedate,pipeline&associations=contacts&limit=100',
+      token
+    );
+
+    if (!response?.results) {
+      throw new Error('Invalid response format from HubSpot API');
+    }
+
+    // Store deals in database
+    const deals = response.results;
+    for (const deal of deals) {
+      await prisma.hubspotDeal.upsert({
+        where: {
+          hubspotAccountId_hubspotId: {
+            hubspotAccountId: account.id,
+            hubspotId: deal.id,
+          },
+        },
+        create: {
+          hubspotId: deal.id,
+          name: deal.properties.dealname,
+          stage: deal.properties.dealstage,
+          amount: deal.properties.amount ? parseFloat(deal.properties.amount) : null,
+          closeDate: deal.properties.closedate ? new Date(deal.properties.closedate) : null,
+          pipeline: deal.properties.pipeline,
+          properties: deal.properties,
+          hubspotAccountId: account.id,
+          lastSyncedAt: new Date(),
+        },
+        update: {
+          name: deal.properties.dealname,
+          stage: deal.properties.dealstage,
+          amount: deal.properties.amount ? parseFloat(deal.properties.amount) : null,
+          closeDate: deal.properties.closedate ? new Date(deal.properties.closedate) : null,
+          pipeline: deal.properties.pipeline,
+          properties: deal.properties,
+          lastSyncedAt: new Date(),
+        },
+      });
+    }
+
+    return response;
   } catch (error) {
-    console.error('Error fetching deals:', error);
-    throw error;
+    if (error instanceof Error) {
+      throw new Error(`Failed to fetch deals: ${error.message}`);
+    }
+    throw new Error('Failed to fetch deals');
   }
 }
 
-export async function validateHubspotToken(token: string, authType: 'oauth' | 'private'): Promise<boolean> {
+export async function validateHubspotToken(
+  token: string,
+  authType: 'oauth' | 'private'
+): Promise<boolean> {
   try {
     const endpoint = authType === 'private'
-      ? 'https://api.hubapi.com/crm/v3/objects/contacts'
-      : 'https://api.hubapi.com/oauth/v1/access-tokens/';
+      ? '/crm/v3/objects/contacts?limit=1'
+      : '/oauth/v1/access-tokens/';
 
-    const response = await fetch(endpoint, {
+    const response = await fetch(`${HUBSPOT_API_URL}${endpoint}`, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -101,30 +255,37 @@ export async function validateHubspotToken(token: string, authType: 'oauth' | 'p
 }
 
 export async function syncHubspotData(userId: string) {
-  const account = await prisma.hubspotAccount.findFirst({
-    where: { 
-      userId,
-      status: 'active'
+  try {
+    const account = await prisma.hubspotAccount.findFirst({
+      where: { 
+        userId,
+        status: 'active'
+      }
+    });
+
+    if (!account) {
+      throw new Error('HubSpot account not found');
     }
-  });
 
-  if (!account) {
-    throw new Error('HubSpot account not found');
+    const [contacts, deals] = await Promise.all([
+      fetchContacts(userId),
+      fetchDeals(userId)
+    ]);
+
+    // Update last sync time
+    await prisma.hubspotAccount.update({
+      where: { id: account.id },
+      data: { lastSyncedAt: new Date() },
+    });
+
+    return {
+      contacts: contacts?.results || [],
+      deals: deals?.results || [],
+    };
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Failed to sync HubSpot data: ${error.message}`);
+    }
+    throw new Error('Failed to sync HubSpot data');
   }
-
-  const [contacts, deals] = await Promise.all([
-    fetchContacts(userId),
-    fetchDeals(userId)
-  ]);
-
-  // Update last sync time
-  await prisma.hubspotAccount.update({
-    where: { id: account.id },
-    data: { lastSyncedAt: new Date() },
-  });
-
-  return {
-    contacts,
-    deals
-  };
 } 

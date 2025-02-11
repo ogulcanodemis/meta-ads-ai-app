@@ -10,6 +10,14 @@ interface Settings {
   lastSynced?: string;
   updatedAt?: string;
 
+  // HubSpot API Settings
+  hubspotAuthType: 'oauth' | 'private';
+  hubspotAppId?: string;
+  hubspotClientSecret?: string;
+  hubspotPrivateKey?: string;
+  hubspotAccountName?: string;
+  hubspotLastSynced?: string;
+
   // App Settings
   theme: 'light' | 'dark' | 'system';
   language: string;
@@ -56,15 +64,21 @@ const DEFAULT_SETTINGS: Settings = {
     ctr: 1
   },
   aiSuggestions: true,
+  hubspotAuthType: 'oauth',
+  hubspotAppId: '',
+  hubspotClientSecret: '',
+  hubspotPrivateKey: '',
+  hubspotAccountName: '',
 };
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  const [activeTab, setActiveTab] = useState<'meta' | 'app' | 'notifications' | 'ai'>('meta');
+  const [activeTab, setActiveTab] = useState<'meta' | 'hubspot' | 'app' | 'notifications' | 'ai'>('meta');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isTestingApi, setIsTestingApi] = useState(false);
+  const [isTestingHubspot, setIsTestingHubspot] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -164,6 +178,57 @@ export default function SettingsPage() {
     }
   };
 
+  const handleTestHubspotConnection = async () => {
+    let token;
+    if (settings.hubspotAuthType === 'oauth') {
+      if (!settings.hubspotAppId || !settings.hubspotClientSecret) {
+        setError('Please enter both App ID and Client Secret');
+        return;
+      }
+      token = settings.hubspotClientSecret; // Use Client Secret as token for OAuth
+    } else {
+      if (!settings.hubspotPrivateKey) {
+        setError('Please enter your Private App Key');
+        return;
+      }
+      token = settings.hubspotPrivateKey;
+    }
+
+    try {
+      setIsTestingHubspot(true);
+      setError(null);
+      console.log('Testing HubSpot connection...');
+
+      const response = await fetchWithAuth('/hubspot/test', {
+        method: 'POST',
+        body: JSON.stringify({ 
+          token,
+          authType: settings.hubspotAuthType 
+        }),
+      });
+
+      if (response.error) {
+        throw new Error(response.error);
+      }
+
+      setSuccessMessage('HubSpot connection successful!');
+      setTimeout(() => setSuccessMessage(null), 3000);
+
+      // Update settings with the new account info
+      setSettings(prev => ({
+        ...prev,
+        hubspotAccountName: response.account.name,
+        hubspotLastSynced: new Date().toISOString()
+      }));
+
+    } catch (err) {
+      console.error('Test HubSpot connection error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to test HubSpot connection');
+    } finally {
+      setIsTestingHubspot(false);
+    }
+  };
+
   const renderMetaSettings = () => (
     <div className="space-y-4">
       <div>
@@ -218,6 +283,120 @@ export default function SettingsPage() {
           className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50"
         >
           {isTestingApi ? 'Testing...' : 'Test Connection'}
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderHubspotSettings = () => (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          Authentication Type
+        </label>
+        <select
+          value={settings.hubspotAuthType}
+          onChange={(e) => setSettings(prev => ({ ...prev, hubspotAuthType: e.target.value as 'oauth' | 'private' }))}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+        >
+          <option value="oauth">OAuth (App ID & Client Secret)</option>
+          <option value="private">Private App Key</option>
+        </select>
+      </div>
+
+      {settings.hubspotAuthType === 'oauth' ? (
+        <>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              HubSpot App ID
+            </label>
+            <div className="mt-1 flex gap-2">
+              <input
+                type="text"
+                value={settings.hubspotAppId || ''}
+                onChange={(e) => setSettings(prev => ({ ...prev, hubspotAppId: e.target.value }))}
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                placeholder="Enter your HubSpot App ID"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              HubSpot Client Secret
+            </label>
+            <div className="mt-1 flex gap-2">
+              <input
+                type="password"
+                value={settings.hubspotClientSecret || ''}
+                onChange={(e) => setSettings(prev => ({ ...prev, hubspotClientSecret: e.target.value }))}
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                placeholder="Enter your HubSpot Client Secret"
+              />
+              <button
+                type="button"
+                onClick={() => window.open('https://app.hubspot.com/developer-docs/api', '_blank')}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              >
+                Get OAuth Credentials
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            HubSpot Private App Key
+          </label>
+          <div className="mt-1 flex gap-2">
+            <input
+              type="password"
+              value={settings.hubspotPrivateKey || ''}
+              onChange={(e) => setSettings(prev => ({ ...prev, hubspotPrivateKey: e.target.value }))}
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              placeholder="Enter your HubSpot Private App key"
+            />
+            <button
+              type="button"
+              onClick={() => window.open('https://developers.hubspot.com/docs/api/private-apps', '_blank')}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+            >
+              Create Private App
+            </button>
+          </div>
+        </div>
+      )}
+
+      {settings?.hubspotAccountName && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Connected Account
+          </label>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            {settings.hubspotAccountName}
+          </p>
+        </div>
+      )}
+
+      {settings?.hubspotLastSynced && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Last Synced
+          </label>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            {new Date(settings.hubspotLastSynced).toLocaleString()}
+          </p>
+        </div>
+      )}
+
+      <div className="mt-6 flex items-center gap-4">
+        <button
+          type="button"
+          onClick={handleTestHubspotConnection}
+          disabled={isTestingHubspot || (!settings?.hubspotAppId && !settings?.hubspotClientSecret && !settings?.hubspotPrivateKey)}
+          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50"
+        >
+          {isTestingHubspot ? 'Testing...' : 'Test Connection'}
         </button>
       </div>
     </div>
@@ -550,6 +729,16 @@ export default function SettingsPage() {
                 Meta API
               </button>
               <button
+                onClick={() => setActiveTab('hubspot')}
+                className={`px-3 py-2 text-sm font-medium rounded-md ${
+                  activeTab === 'hubspot'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-100'
+                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+              >
+                HubSpot
+              </button>
+              <button
                 onClick={() => setActiveTab('app')}
                 className={`px-3 py-2 text-sm font-medium rounded-md ${
                   activeTab === 'app'
@@ -596,6 +785,7 @@ export default function SettingsPage() {
             )}
 
             {activeTab === 'meta' && renderMetaSettings()}
+            {activeTab === 'hubspot' && renderHubspotSettings()}
             {activeTab === 'app' && renderAppSettings()}
             {activeTab === 'notifications' && renderNotificationSettings()}
             {activeTab === 'ai' && renderAISettings()}
