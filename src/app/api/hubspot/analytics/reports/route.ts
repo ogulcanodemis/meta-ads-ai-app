@@ -2,6 +2,22 @@ import { NextResponse } from 'next/server';
 import { authenticateTokenWithPrisma } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+interface AnalyticsMetrics {
+  spend: number;
+  conversions: number;
+  clicks: number;
+  impressions: number;
+  revenue: number;
+}
+
+const defaultMetrics: AnalyticsMetrics = {
+  spend: 0,
+  conversions: 0,
+  clicks: 0,
+  impressions: 0,
+  revenue: 0
+};
+
 export async function GET(request: Request) {
   try {
     const user = await authenticateTokenWithPrisma(request);
@@ -45,7 +61,7 @@ export async function GET(request: Request) {
         startDate.setDate(now.getDate() - 30);
     }
 
-    // Get all deals
+    // Get deals from HubSpot
     const deals = await prisma.hubspotDeal.findMany({
       where: {
         hubspotAccountId: hubspotAccount.id,
@@ -55,17 +71,7 @@ export async function GET(request: Request) {
       }
     });
 
-    // Get all contacts
-    const contacts = await prisma.hubspotContact.findMany({
-      where: {
-        hubspotAccountId: hubspotAccount.id,
-        createdAt: {
-          gte: startDate
-        }
-      }
-    });
-
-    // Get all campaigns
+    // Get campaigns from Meta
     const campaigns = await prisma.campaign.findMany({
       where: {
         userId: user.id,
@@ -74,122 +80,64 @@ export async function GET(request: Request) {
         }
       },
       include: {
-        adSets: {
-          include: {
-            ads: true
-          }
+        analytics: {
+          orderBy: {
+            date: 'desc'
+          },
+          take: 1
         }
       }
     });
 
-    // Calculate deal metrics
-    const dealMetrics = {
-      totalDeals: deals.length,
-      totalRevenue: deals.reduce((sum, deal) => sum + (deal.amount || 0), 0),
-      wonDeals: deals.filter(deal => deal.stage === 'closedwon').length,
-      wonRevenue: deals
-        .filter(deal => deal.stage === 'closedwon')
-        .reduce((sum, deal) => sum + (deal.amount || 0), 0),
-      averageDealSize: deals.length > 0 
-        ? deals.reduce((sum, deal) => sum + (deal.amount || 0), 0) / deals.length 
-        : 0,
-      dealsByStage: deals.reduce((acc, deal) => {
-        const stage = deal.stage || 'unknown';
-        if (!acc[stage]) {
-          acc[stage] = {
-            count: 0,
-            value: 0
-          };
-        }
-        acc[stage].count++;
-        acc[stage].value += deal.amount || 0;
-        return acc;
-      }, {} as Record<string, { count: number; value: number }>)
-    };
+    // Format deals into performance reports
+    const dealReports = deals.map(deal => ({
+      id: deal.id,
+      type: 'deal' as const,
+      name: deal.name,
+      date: deal.createdAt.toISOString(),
+      metrics: {
+        revenue: deal.amount || 0,
+        deals: 1,
+        roi: deal.stage === 'closedwon' ? 100 : 0
+      },
+      status: deal.stage,
+      source: 'HubSpot' as const
+    }));
 
-    // Calculate contact metrics
-    const contactMetrics = {
-      totalContacts: contacts.length,
-      activeContacts: contacts.filter(contact => {
-        const lastActivity = contact.lastSyncedAt || contact.updatedAt;
-        const daysSinceActivity = Math.floor((now.getTime() - lastActivity.getTime()) / (1000 * 60 * 60 * 24));
-        return daysSinceActivity <= 30;
-      }).length,
-      contactsBySource: contacts.reduce((acc, contact) => {
-        const properties = contact.properties as any;
-        const source = properties?.source || 'Direct';
-        if (!acc[source]) {
-          acc[source] = 0;
-        }
-        acc[source]++;
-        return acc;
-      }, {} as Record<string, number>)
-    };
-
-    // Calculate campaign metrics
-    const campaignMetrics = campaigns.map(campaign => {
-      const totalSpend = campaign.adSets.reduce((sum, adSet) => 
-        sum + adSet.ads.reduce((adSum, ad) => adSum + (ad.spend || 0), 0)
-      , 0);
-
-      const totalClicks = campaign.adSets.reduce((sum, adSet) => 
-        sum + adSet.ads.reduce((adSum, ad) => adSum + (ad.clicks || 0), 0)
-      , 0);
-
-      const totalImpressions = campaign.adSets.reduce((sum, adSet) => 
-        sum + adSet.ads.reduce((adSum, ad) => adSum + (ad.impressions || 0), 0)
-      , 0);
-
-      const totalConversions = campaign.adSets.reduce((sum, adSet) => 
-        sum + adSet.ads.reduce((adSum, ad) => adSum + (ad.conversions || 0), 0)
-      , 0);
+    // Format campaigns into performance reports
+    const campaignReports = campaigns.map(campaign => {
+      const metricsData = campaign.analytics[0]?.metrics;
+      const analytics: AnalyticsMetrics = {
+        ...defaultMetrics,
+        ...(typeof metricsData === 'object' && metricsData !== null ? metricsData as Partial<AnalyticsMetrics> : {})
+      };
+      
+      const { spend, conversions, clicks, impressions, revenue } = analytics;
 
       return {
         id: campaign.id,
+        type: 'campaign' as const,
         name: campaign.name,
+        date: campaign.createdAt.toISOString(),
+        metrics: {
+          spend,
+          conversions,
+          revenue,
+          roi: spend > 0 ? ((revenue) - spend) / spend * 100 : 0,
+          ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+          cpc: clicks > 0 ? spend / clicks : 0
+        },
         status: campaign.status,
-        spend: totalSpend,
-        clicks: totalClicks,
-        impressions: totalImpressions,
-        conversions: totalConversions,
-        ctr: totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0,
-        cpc: totalClicks > 0 ? totalSpend / totalClicks : 0,
-        conversionRate: totalClicks > 0 ? (totalConversions / totalClicks) * 100 : 0,
-        cpa: totalConversions > 0 ? totalSpend / totalConversions : 0
+        source: 'Meta' as const
       };
     });
 
-    // Calculate overall campaign metrics
-    const overallCampaignMetrics = {
-      totalCampaigns: campaigns.length,
-      activeCampaigns: campaigns.filter(c => c.status === 'ACTIVE').length,
-      totalSpend: campaignMetrics.reduce((sum, campaign) => sum + campaign.spend, 0),
-      totalClicks: campaignMetrics.reduce((sum, campaign) => sum + campaign.clicks, 0),
-      totalImpressions: campaignMetrics.reduce((sum, campaign) => sum + campaign.impressions, 0),
-      totalConversions: campaignMetrics.reduce((sum, campaign) => sum + campaign.conversions, 0),
-      overallCTR: campaignMetrics.reduce((sum, campaign) => sum + campaign.ctr, 0) / campaigns.length,
-      overallCPC: campaignMetrics.reduce((sum, campaign) => sum + campaign.cpc, 0) / campaigns.length,
-      overallConversionRate: campaignMetrics.reduce((sum, campaign) => sum + campaign.conversionRate, 0) / campaigns.length,
-      overallCPA: campaignMetrics.reduce((sum, campaign) => sum + campaign.cpa, 0) / campaigns.length
-    };
-
-    // Calculate ROI
-    const roi = overallCampaignMetrics.totalSpend > 0 
-      ? ((dealMetrics.wonRevenue - overallCampaignMetrics.totalSpend) / overallCampaignMetrics.totalSpend) * 100 
-      : 0;
+    // Combine and sort all reports by date
+    const allReports = [...dealReports, ...campaignReports]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return NextResponse.json({
-      data: {
-        dealMetrics,
-        contactMetrics,
-        campaignMetrics,
-        overallCampaignMetrics,
-        roi,
-        dateRange: {
-          start: startDate.toISOString(),
-          end: now.toISOString()
-        }
-      },
+      data: allReports,
       success: true
     });
   } catch (error) {
