@@ -55,7 +55,7 @@ export async function GET(request: Request) {
       }
     });
 
-    // Calculate revenue metrics
+    // Calculate deal metrics
     const totalRevenue = deals.reduce((sum, deal) => sum + (deal.amount || 0), 0);
     const wonDeals = deals.filter(deal => deal.stage === 'closedwon');
     const wonRevenue = wonDeals.reduce((sum, deal) => sum + (deal.amount || 0), 0);
@@ -85,6 +85,7 @@ export async function GET(request: Request) {
         const nextDate = new Date(date);
         nextDate.setDate(date.getDate() + 1);
 
+        // Get daily deals
         const dailyDeals = await prisma.hubspotDeal.findMany({
           where: {
             hubspotAccountId: hubspotAccount.id,
@@ -95,19 +96,63 @@ export async function GET(request: Request) {
           }
         });
 
-        const newRevenue = dailyDeals.reduce((sum, deal) => sum + (deal.amount || 0), 0);
-        const wonDeals = dailyDeals.filter(deal => deal.stage === 'closedwon');
-        const closedRevenue = wonDeals.reduce((sum, deal) => sum + (deal.amount || 0), 0);
+        // Get daily campaigns
+        const dailyCampaigns = await prisma.campaign.findMany({
+          where: {
+            userId: user.id,
+            createdAt: {
+              gte: date,
+              lt: nextDate
+            }
+          },
+          include: {
+            analytics: {
+              orderBy: {
+                date: 'desc'
+              },
+              take: 1
+            }
+          }
+        });
+
+        const dailyRevenue = dailyDeals.reduce((sum, deal) => sum + (deal.amount || 0), 0);
+        const dailyWonDeals = dailyDeals.filter(deal => deal.stage === 'closedwon');
+        const dailyWonRevenue = dailyWonDeals.reduce((sum, deal) => sum + (deal.amount || 0), 0);
+
+        const dailySpend = dailyCampaigns.reduce((sum, campaign) => 
+          sum + (campaign.analytics[0]?.metrics?.spend || 0)
+        , 0);
 
         return {
           date: date.toISOString(),
-          newRevenue,
-          closedRevenue,
+          revenue: dailyRevenue,
+          wonRevenue: dailyWonRevenue,
           deals: dailyDeals.length,
-          wonDeals: wonDeals.length
+          wonDeals: dailyWonDeals.length,
+          spend: dailySpend
         };
       })
     );
+
+    // Calculate revenue by source
+    const revenueBySource = deals.reduce((acc, deal) => {
+      const properties = deal.properties as Record<string, any>;
+      const source = properties?.source || 'Direct';
+      
+      if (!acc[source]) {
+        acc[source] = {
+          totalRevenue: 0,
+          deals: 0,
+          avgDealSize: 0
+        };
+      }
+      
+      acc[source].totalRevenue += deal.amount || 0;
+      acc[source].deals++;
+      acc[source].avgDealSize = acc[source].totalRevenue / acc[source].deals;
+      
+      return acc;
+    }, {} as Record<string, { totalRevenue: number; deals: number; avgDealSize: number }>);
 
     // Calculate forecasted revenue (simple projection based on current pipeline)
     const pipelineValue = deals
@@ -116,33 +161,15 @@ export async function GET(request: Request) {
 
     const forecastedRevenue = pipelineValue * 0.7; // 70% of pipeline value as a simple forecast
 
-    // Calculate revenue by source
-    const revenueBySource = deals.reduce((acc, deal) => {
-      const source = deal.source || 'Direct';
-      if (!acc[source]) {
-        acc[source] = {
-          totalRevenue: 0,
-          deals: 0,
-          avgDealSize: 0
-        };
-      }
-      acc[source].totalRevenue += deal.amount || 0;
-      acc[source].deals++;
-      acc[source].avgDealSize = acc[source].totalRevenue / acc[source].deals;
-      return acc;
-    }, {} as Record<string, { totalRevenue: number; deals: number; avgDealSize: number }>);
-
     return NextResponse.json({
       data: {
-        summary: {
-          totalRevenue,
-          wonRevenue,
-          averageDealSize,
-          forecastedRevenue,
-          totalDeals: deals.length,
-          wonDeals: wonDeals.length,
-          pipelineValue
-        },
+        totalRevenue,
+        wonRevenue,
+        averageDealSize,
+        forecastedRevenue,
+        totalDeals: deals.length,
+        wonDeals: wonDeals.length,
+        pipelineValue,
         dealsByStage,
         revenueOverTime,
         revenueBySource

@@ -1,50 +1,72 @@
+"use client";
+
 import { useState, useEffect } from 'react';
-import { DollarSign, Filter, Download, Calendar, TrendingUp, Target, BarChart3, PieChart } from 'lucide-react';
+import { 
+  DollarSign, 
+  TrendingUp, 
+  Calendar, 
+  Download,
+  Target,
+  BarChart3,
+  ArrowUp,
+  ArrowDown,
+  Filter
+} from 'lucide-react';
 import { fetchWithAuth } from '@/lib/utils/api';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  AreaChart,
+  Area,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
+} from 'recharts';
 
-interface RevenueOverTime {
-  date: string;
-  newRevenue: number;
-  closedRevenue: number;
-  deals: number;
+interface RevenueMetrics {
+  totalRevenue: number;
+  wonRevenue: number;
+  averageDealSize: number;
+  forecastedRevenue: number;
+  totalDeals: number;
   wonDeals: number;
-}
-
-interface RevenueBySource {
-  [key: string]: {
-    totalRevenue: number;
-    deals: number;
-    avgDealSize: number;
+  pipelineValue: number;
+  dealsByStage: {
+    [key: string]: {
+      count: number;
+      value: number;
+    };
   };
-}
-
-interface DealsByStage {
-  [key: string]: {
-    count: number;
-    value: number;
-  };
-}
-
-interface RevenueAnalytics {
-  summary: {
-    totalRevenue: number;
+  revenueOverTime: Array<{
+    date: string;
+    revenue: number;
     wonRevenue: number;
-    averageDealSize: number;
-    forecastedRevenue: number;
-    totalDeals: number;
+    deals: number;
     wonDeals: number;
-    pipelineValue: number;
+    spend: number;
+  }>;
+  revenueBySource: {
+    [key: string]: {
+      totalRevenue: number;
+      deals: number;
+      avgDealSize: number;
+    };
   };
-  dealsByStage: DealsByStage;
-  revenueOverTime: RevenueOverTime[];
-  revenueBySource: RevenueBySource;
 }
 
 export default function RevenueAnalytics() {
   const [dateRange, setDateRange] = useState('last30');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<RevenueAnalytics | null>(null);
+  const [data, setData] = useState<RevenueMetrics | null>(null);
 
   const fetchData = async () => {
     try {
@@ -86,47 +108,48 @@ export default function RevenueAnalytics() {
   const handleExport = () => {
     if (!data) return;
 
-    // Convert data to CSV
-    const headers = [
-      ['Revenue Analytics Summary'],
+    // CSV içeriğini hazırla
+    const csvContent = [
+      ['Revenue Analytics Report'],
+      [`Generated on: ${new Date().toLocaleDateString()}`],
+      [],
+      ['Revenue Metrics'],
       ['Metric', 'Value'],
-      ['Total Revenue', formatCurrency(data.summary.totalRevenue)],
-      ['Won Revenue', formatCurrency(data.summary.wonRevenue)],
-      ['Average Deal Size', formatCurrency(data.summary.averageDealSize)],
-      ['Forecasted Revenue', formatCurrency(data.summary.forecastedRevenue)],
-      ['Total Deals', data.summary.totalDeals],
-      ['Won Deals', data.summary.wonDeals],
-      ['Pipeline Value', formatCurrency(data.summary.pipelineValue)],
+      ['Total Revenue', formatCurrency(data.totalRevenue)],
+      ['Won Revenue', formatCurrency(data.wonRevenue)],
+      ['Pipeline Value', formatCurrency(data.pipelineValue)],
+      ['Forecasted Revenue', formatCurrency(data.forecastedRevenue)],
       [],
       ['Revenue by Stage'],
-      ['Stage', 'Deal Count', 'Value'],
+      ['Stage', 'Count', 'Value'],
       ...Object.entries(data.dealsByStage).map(([stage, metrics]) => [
         stage,
         metrics.count,
         formatCurrency(metrics.value)
       ]),
       [],
+      ['Revenue Over Time'],
+      ['Date', 'Revenue', 'Won Revenue', 'Deals', 'Won Deals', 'Spend'],
+      ...data.revenueOverTime.map(day => [
+        new Date(day.date).toLocaleDateString(),
+        formatCurrency(day.revenue),
+        formatCurrency(day.wonRevenue),
+        day.deals,
+        day.wonDeals,
+        formatCurrency(day.spend)
+      ]),
+      [],
       ['Revenue by Source'],
-      ['Source', 'Total Revenue', 'Deals', 'Average Deal Size'],
+      ['Source', 'Total Revenue', 'Deals', 'Avg Deal Size'],
       ...Object.entries(data.revenueBySource).map(([source, metrics]) => [
         source,
         formatCurrency(metrics.totalRevenue),
         metrics.deals,
         formatCurrency(metrics.avgDealSize)
-      ]),
-      [],
-      ['Revenue Over Time'],
-      ['Date', 'New Revenue', 'Closed Revenue', 'Deals', 'Won Deals'],
-      ...data.revenueOverTime.map(day => [
-        new Date(day.date).toLocaleDateString(),
-        formatCurrency(day.newRevenue),
-        formatCurrency(day.closedRevenue),
-        day.deals,
-        day.wonDeals
       ])
-    ];
+    ].map(row => row.join(',')).join('\n');
 
-    const csvContent = headers.map(row => row.join(',')).join('\n');
+    // CSV dosyasını indir
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -214,7 +237,7 @@ export default function RevenueAnalytics() {
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Total Revenue</p>
               <p className="text-2xl font-bold mt-1 text-gray-900 dark:text-gray-100">
-                {formatCurrency(data.summary.totalRevenue)}
+                {formatCurrency(data.totalRevenue)}
               </p>
             </div>
             <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
@@ -227,7 +250,7 @@ export default function RevenueAnalytics() {
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Won Revenue</p>
               <p className="text-2xl font-bold mt-1 text-gray-900 dark:text-gray-100">
-                {formatCurrency(data.summary.wonRevenue)}
+                {formatCurrency(data.wonRevenue)}
               </p>
             </div>
             <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
@@ -240,7 +263,7 @@ export default function RevenueAnalytics() {
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Pipeline Value</p>
               <p className="text-2xl font-bold mt-1 text-gray-900 dark:text-gray-100">
-                {formatCurrency(data.summary.pipelineValue)}
+                {formatCurrency(data.pipelineValue)}
               </p>
             </div>
             <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
@@ -253,7 +276,7 @@ export default function RevenueAnalytics() {
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Forecasted Revenue</p>
               <p className="text-2xl font-bold mt-1 text-gray-900 dark:text-gray-100">
-                {formatCurrency(data.summary.forecastedRevenue)}
+                {formatCurrency(data.forecastedRevenue)}
               </p>
             </div>
             <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
@@ -267,32 +290,210 @@ export default function RevenueAnalytics() {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Revenue by Stage</h2>
         <div className="space-y-4">
-          {Object.entries(data.dealsByStage).map(([stage, metrics]) => (
-            <div key={stage} className="relative">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-900 dark:text-gray-100">{stage}</span>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    ({metrics.count} deals)
-                  </span>
+          {Object.entries(data.dealsByStage).map(([stage, metrics]) => {
+            // Stage ismini daha okunabilir hale getir
+            const stageName = stage
+              .replace(/([A-Z])/g, ' $1') // CamelCase'i boşluklarla ayır
+              .split('_') // Snake case'i böl
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()) // Her kelimenin ilk harfini büyük yap
+              .join(' ');
+
+            // Progress bar için renk belirle
+            const getStageColor = (stageName: string) => {
+              const colors: { [key: string]: string } = {
+                'Appointment Scheduled': 'bg-blue-500',
+                'Qualified': 'bg-green-500',
+                'Presentation': 'bg-yellow-500',
+                'Proposal': 'bg-orange-500',
+                'Negotiation': 'bg-red-500',
+                'Closed Won': 'bg-emerald-500',
+                'Closed Lost': 'bg-gray-500'
+              };
+              // Varsayılan renk
+              return colors[stageName.split(' ')[0]] || 'bg-blue-500';
+            };
+
+            return (
+              <div key={stage} className="relative">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full ${getStageColor(stageName)}`} />
+                    <span className="font-medium text-gray-900 dark:text-gray-100">
+                      {stageName}
+                    </span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      ({metrics.count} {metrics.count === 1 ? 'deal' : 'deals'})
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      {((metrics.value / data.totalRevenue) * 100).toFixed(1)}%
+                    </span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">
+                      {formatCurrency(metrics.value)}
+                    </span>
+                  </div>
                 </div>
-                <span className="font-medium text-gray-900 dark:text-gray-100">
-                  {formatCurrency(metrics.value)}
-                </span>
+                <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-500 ${getStageColor(stageName)}`}
+                    style={{ width: `${Math.max((metrics.value / data.totalRevenue) * 100, 3)}%` }}
+                  />
+                </div>
               </div>
-              <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-blue-500 transition-all duration-500"
-                  style={{ width: `${(metrics.value / data.summary.totalRevenue) * 100}%` }}
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Revenue Over Time Charts */}
+      <div className="space-y-6">
+        {/* Line Chart */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Revenue Trends</h2>
+          <div className="h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data.revenueOverTime}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="date" 
+                  tickFormatter={(value) => new Date(value).toLocaleDateString()}
                 />
-              </div>
-            </div>
-          ))}
+                <YAxis 
+                  tickFormatter={(value) => formatCurrency(value)}
+                />
+                <Tooltip 
+                  formatter={(value: number) => formatCurrency(value)}
+                  labelFormatter={(label) => new Date(label).toLocaleDateString()}
+                />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="revenue" 
+                  name="Total Revenue"
+                  stroke="#3b82f6" 
+                  strokeWidth={2}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="wonRevenue" 
+                  name="Won Revenue"
+                  stroke="#10b981" 
+                  strokeWidth={2}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Bar Chart */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Revenue Comparison</h2>
+          <div className="h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data.revenueOverTime}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="date" 
+                  tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                />
+                <YAxis 
+                  tickFormatter={(value) => formatCurrency(value)}
+                />
+                <Tooltip 
+                  formatter={(value: number) => formatCurrency(value)}
+                  labelFormatter={(label) => new Date(label).toLocaleDateString()}
+                />
+                <Legend />
+                <Bar dataKey="revenue" name="Total Revenue" fill="#3b82f6" />
+                <Bar dataKey="wonRevenue" name="Won Revenue" fill="#10b981" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Area Chart */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Cumulative Revenue</h2>
+          <div className="h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data.revenueOverTime}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="date" 
+                  tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                />
+                <YAxis 
+                  tickFormatter={(value) => formatCurrency(value)}
+                />
+                <Tooltip 
+                  formatter={(value: number) => formatCurrency(value)}
+                  labelFormatter={(label) => new Date(label).toLocaleDateString()}
+                />
+                <Legend />
+                <Area 
+                  type="monotone" 
+                  dataKey="revenue" 
+                  name="Total Revenue" 
+                  fill="#3b82f6" 
+                  fillOpacity={0.3}
+                  stroke="#3b82f6"
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="wonRevenue" 
+                  name="Won Revenue" 
+                  fill="#10b981" 
+                  fillOpacity={0.3}
+                  stroke="#10b981"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Pie Chart */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Revenue Distribution</h2>
+          <div className="h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={Object.entries(data.revenueBySource).map(([source, metrics]) => ({
+                    name: source,
+                    value: metrics.totalRevenue
+                  }))}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                  outerRadius={150}
+                  fill="#8884d8"
+                >
+                  {Object.entries(data.revenueBySource).map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={[
+                        '#3b82f6',
+                        '#10b981',
+                        '#6366f1',
+                        '#ec4899',
+                        '#f59e0b',
+                        '#8b5cf6'
+                      ][index % 6]} 
+                    />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
 
       {/* Revenue by Source */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Revenue by Source</h2>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -323,48 +524,6 @@ export default function RevenueAnalytics() {
               ))}
             </tbody>
           </table>
-        </div>
-      </div>
-
-      {/* Revenue Over Time */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Revenue Over Time</h2>
-        <div className="space-y-4">
-          {data.revenueOverTime.map((day) => (
-            <div key={day.date} className="flex items-center justify-between">
-              <div>
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  {new Date(day.date).toLocaleDateString()}
-                </span>
-              </div>
-              <div className="flex items-center gap-6">
-                <div>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">New Revenue</span>
-                  <span className="ml-2 font-medium text-gray-900 dark:text-gray-100">
-                    {formatCurrency(day.newRevenue)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Closed Revenue</span>
-                  <span className="ml-2 font-medium text-gray-900 dark:text-gray-100">
-                    {formatCurrency(day.closedRevenue)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Deals</span>
-                  <span className="ml-2 font-medium text-gray-900 dark:text-gray-100">
-                    {formatNumber(day.deals)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Won Deals</span>
-                  <span className="ml-2 font-medium text-gray-900 dark:text-gray-100">
-                    {formatNumber(day.wonDeals)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
     </div>

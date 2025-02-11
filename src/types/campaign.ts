@@ -1,3 +1,15 @@
+export interface CampaignMetrics {
+  spend: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  revenue: number;
+  ctr: number;
+  cpc: number;
+  roas: number;
+  conversion_rate: number;
+}
+
 export interface Campaign {
   id: string;
   name: string;
@@ -9,6 +21,10 @@ export interface Campaign {
   lifetime_budget?: number;
   adAccountId: string;
   adAccountName: string;
+  analytics: {
+    metrics: CampaignMetrics;
+    date: Date;
+  }[];
   metrics: {
     // Temel metrikler
     impressions: number;

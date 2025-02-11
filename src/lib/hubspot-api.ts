@@ -9,7 +9,7 @@ import type {
 
 const HUBSPOT_API_URL = 'https://api.hubapi.com';
 
-async function fetchHubspotApi<T>(
+export async function fetchHubspotApi<T>(
   endpoint: string,
   token: string,
   options: RequestInit = {}
@@ -94,58 +94,73 @@ export async function fetchContacts(userId: string): Promise<HubspotContactsResp
     if (!token) {
       throw new Error('No valid authentication token found');
     }
+
+    // Fetch all contacts using pagination
+    let allContacts: HubspotContact[] = [];
+    let after: string | undefined;
     
-    const response = await fetchHubspotApi<HubspotContactsResponse>(
-      '/crm/v3/objects/contacts?properties=email,firstname,lastname,phone,company,jobtitle,lifecyclestage&limit=100',
-      token
+    do {
+      const endpoint = '/crm/v3/objects/contacts' +
+        '?properties=email,firstname,lastname,phone,company,jobtitle,lifecyclestage' +
+        '&limit=100' +
+        (after ? `&after=${after}` : '');
+      
+      const response = await fetchHubspotApi<HubspotContactsResponse>(endpoint, token);
+
+      if (!response?.results) {
+        throw new Error('Invalid response format from HubSpot API');
+      }
+
+      allContacts = [...allContacts, ...response.results];
+      after = response.paging?.next?.after;
+    } while (after);
+
+    // Store contacts in database using transaction for better performance
+    await prisma.$transaction(
+      allContacts.map(contact => 
+        prisma.hubspotContact.upsert({
+          where: {
+            hubspotAccountId_hubspotId: {
+              hubspotAccountId: account.id,
+              hubspotId: contact.id,
+            },
+          },
+          create: {
+            hubspotId: contact.id,
+            email: contact.properties.email || '',
+            firstName: contact.properties.firstname,
+            lastName: contact.properties.lastname,
+            phone: contact.properties.phone,
+            company: contact.properties.company,
+            jobTitle: contact.properties.jobtitle,
+            lifecycle_stage: contact.properties.lifecyclestage,
+            properties: contact.properties,
+            lastSyncedAt: new Date(),
+            hubspotAccount: {
+              connect: {
+                id: account.id
+              }
+            }
+          },
+          update: {
+            email: contact.properties.email || '',
+            firstName: contact.properties.firstname,
+            lastName: contact.properties.lastname,
+            phone: contact.properties.phone,
+            company: contact.properties.company,
+            jobTitle: contact.properties.jobtitle,
+            lifecycle_stage: contact.properties.lifecyclestage,
+            properties: contact.properties,
+            lastSyncedAt: new Date(),
+          },
+        })
+      )
     );
 
-    if (!response?.results) {
-      throw new Error('Invalid response format from HubSpot API');
-    }
-
-    // Store contacts in database
-    const contacts = response.results;
-    for (const contact of contacts) {
-      await prisma.hubspotContact.upsert({
-        where: {
-          hubspotAccountId_hubspotId: {
-            hubspotAccountId: account.id,
-            hubspotId: contact.id,
-          },
-        },
-        create: {
-          hubspotId: contact.id,
-          email: contact.properties.email || '',
-          firstName: contact.properties.firstname,
-          lastName: contact.properties.lastname,
-          phone: contact.properties.phone,
-          company: contact.properties.company,
-          jobTitle: contact.properties.jobtitle,
-          lifecycle_stage: contact.properties.lifecyclestage,
-          properties: contact.properties,
-          lastSyncedAt: new Date(),
-          hubspotAccount: {
-            connect: {
-              id: account.id
-            }
-          }
-        },
-        update: {
-          email: contact.properties.email || '',
-          firstName: contact.properties.firstname,
-          lastName: contact.properties.lastname,
-          phone: contact.properties.phone,
-          company: contact.properties.company,
-          jobTitle: contact.properties.jobtitle,
-          lifecycle_stage: contact.properties.lifecyclestage,
-          properties: contact.properties,
-          lastSyncedAt: new Date(),
-        },
-      });
-    }
-
-    return response;
+    return {
+      results: allContacts,
+      total: allContacts.length
+    };
   } catch (error) {
     if (error instanceof Error) {
       throw new Error(`Failed to fetch contacts: ${error.message}`);
