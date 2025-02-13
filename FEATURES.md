@@ -42,6 +42,16 @@
 - [ ] Google Ads
 - [ ] LinkedIn Ads
 - [ ] TikTok Ads
+- [ ] Salesforce
+- [ ] HubSpot CRM
+- [ ] Microsoft Dynamics 365
+- [ ] Zoho CRM
+- [ ] Pipedrive
+- [ ] Freshsales (Freshworks CRM)
+- [ ] SugarCRM
+- [ ] Oracle CX
+- [ ] SAP CRM
+- [ ] Nimble
 
 ### AI Özellikleri
 - [ ] Otomatik içgörü üretimi
