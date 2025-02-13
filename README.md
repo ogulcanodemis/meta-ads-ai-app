@@ -201,6 +201,5 @@ src/
 
 ## Support
 
-- Documentation: [docs.example.com](https://docs.example.com)
-- Issues: [GitHub Issues](https://github.com/yourusername/meta-ads-ai-app/issues)
-- Email: support@example.com
+- Email: ogulcan.odemis28@gmail.com
+- LinkedIn: [Oğulcan Ödemiş](https://www.linkedin.com/in/ogulcanodemiss/)
